@@ -114,4 +114,43 @@ The core puzzle logic from `game.js` will be ported to `lib/features/game/engine
 
 ---
 
+## ✨ Key Features
+
+- 💧 **Advanced Liquid Shading**: 3D-styled glass tubes with layered gradients and specular highlights for a premium aesthetic.
+- 🗺️ **Vertical Progress Map**: Level selection via a large, interactive test tube where water rises as you conquer levels.
+- 👥 **Multiplayer Modes**: Support for Online and Offline Multiplayer. Offline mode triggers a forced **Landscape Mode** for optimized side-by-side gameplay.
+- 🎉 **Sensory Celebration**: Fireworks particle systems and celebratory audio sync perfectly with victory.
+- 🕷️ **Studio Integrated Auth**: Secure User ID login, Registration, and Guest Mode with WebSpider Studios branding throughout.
+- ⚙️ **Optimized Engine**: Lightweight, fully offline support with local asset management.
+
+---
+
+## 🚀 Status
+
+| Goal | Status |
+|------|--------|
+| Core Game Engine | ✅ Complete |
+| Vertical Progress Map | ✅ Complete |
+| Multiplayer (Offline/Landscape) | ✅ Complete |
+| Sensory & Visual Polish | ✅ Complete |
+| Studio Branding | ✅ Complete |
+| Google Play Preparation | ✅ Complete |
+| App Store Preparation | 🔄 In Progress |
+
+---
+
+## 📝 Roadmap
+
+- [x] Core game engine (tubes, colors, pour logic)
+- [x] Game board UI (TubeWidget with animations)
+- [x] Welcome/home screen (Studio Branded)
+- [x] Auth flow (login, signup, OTP, guest)
+- [x] Progress Map screen
+- [x] Leaderboard integration
+- [ ] Daily challenges
+- [ ] Apple App Store release
+- [ ] Steam release (Windows build)
+
+---
+
 *Made with 💧 by WebSpider Studios*
