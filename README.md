@@ -1,5 +1,14 @@
 # Aqua Sort — Flutter (Cross-Platform)
-*by WebSpider Studios*
+
+![Banner](assets/screenshots/banner.png)
+
+## 📸 Showcase
+
+| Campaign Map | Gameplay |
+|:---:|:---:|
+| ![Map](assets/screenshots/map.png) | ![Gameplay](assets/screenshots/gameplay.png) |
+
+---
 
 > 🚧 **This is the Flutter rebuild of the original Vanilla JS game.**  
 > The original HTML/CSS/JS version lives at [`../aqua-sort-vanilla/`](../aqua-sort-vanilla/)
