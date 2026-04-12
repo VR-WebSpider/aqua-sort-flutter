@@ -11,7 +11,7 @@
 ---
 
 > 🚧 **This is the Flutter rebuild of the original Vanilla JS game.**  
-> The original HTML/CSS/JS version lives at [`../aqua-sort-vanilla/`](../aqua-sort-vanilla/)
+> The original HTML/CSS/JS version lives at [Aqua-Sort-By-WebSpider-Studios](https://github.com/VR-WebSpider/Aqua-Sort-By-WebSpider-Studios)
 
 ---
 
