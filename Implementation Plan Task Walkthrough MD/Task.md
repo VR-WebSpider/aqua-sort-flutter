@@ -1,0 +1,12 @@
+- [x] Apply database migrations on Supabase to add 7 coin columns and migrate existing balance.
+- [x] Define `get_webspider_currency_v1` and `update_webspider_currency_v1` RPC functions.
+- [x] Register new 128x128 3D coin assets inside `pubspec.yaml`.
+- [x] Update `AuthUser` in `auth_provider.dart` to support all 7 coin types.
+- [x] Update `WalletService` in `wallet_service.dart` to call the new dynamic RPC.
+- [x] Update `LevelProgress` and `LevelNotifier` in `level_provider.dart` to manage the 7 balances, local fallbacks, and exchange logic.
+- [x] Create `WebSpiderVaultDialog` with 3D coin graphics, descriptions, and swapping station.
+- [x] Integrate Vault Button and micro-HUDs in `campaign_screen.dart` header.
+- [x] Update `UndoGateSheet` to allow spending Gold (5) or Copper (50) coins for undos.
+- [x] Update `PauseGateDialog` to allow spending Gold (2) or Brass (20) coins for pauses.
+- [x] Update `game_provider.dart` to debit correct currencies for undos and pauses.
+- [x] Verify code analysis and compile a successful production release APK.

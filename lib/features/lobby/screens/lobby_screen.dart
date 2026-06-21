@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import 'package:aqua_sort/features/game/engine/game_engine.dart';
 import 'package:aqua_sort/features/game/providers/game_provider.dart';
@@ -19,6 +20,68 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
   int _players = 1;
   bool _isOnline = false;
 
+  void _showComingSoonDialog(BuildContext context) {
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'ComingSoon',
+      barrierColor: Colors.black.withOpacity(0.85),
+      transitionDuration: const Duration(milliseconds: 400),
+      pageBuilder: (context, anim1, anim2) {
+        return Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppColors.deepNavy,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: AppColors.cyanGlow, width: 2),
+              boxShadow: [
+                BoxShadow(color: AppColors.cyanGlow.withOpacity(0.3), blurRadius: 40, spreadRadius: 5),
+              ],
+            ),
+            child: Material(
+              color: Colors.transparent,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.public_outlined, size: 80, color: AppColors.cyanGlow).animate(onPlay: (c) => c.repeat())
+                    .shimmer(duration: 2.seconds, color: Colors.white24)
+                    .scale(begin: const Offset(1, 1), end: const Offset(1.1, 1.1), curve: Curves.easeInOut),
+                  const SizedBox(height: 24),
+                  Text(
+                    'GLOBAL DOMINATION AWAITS!',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.righteous(
+                      fontSize: 24,
+                      color: Colors.white,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    "We're currently calibrating the hyper-servers for real-time sorting battles. Soon you'll face off against the world's best sorters for exclusive seasonal rewards and the Title of Grand Alchemist.",
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.outfit(
+                      fontSize: 15,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  GlowButton(
+                    label: 'I AM READY',
+                    onTap: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+          ).animate().scale(begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack).fadeIn(),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
@@ -33,7 +96,10 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AquaHeader(onBack: () => ref.read(authProvider.notifier).logout()),
+                  AquaHeader(
+                    onBack: () => context.go('/lobby'),
+                    onHome: () => context.go('/lobby'),
+                  ),
                   const SizedBox(height: 12),
                   Center(
                     child: Column(
@@ -44,7 +110,7 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                             decoration: BoxDecoration(
                               boxShadow: [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.2), blurRadius: 20)],
                             ),
-                            child: Image.asset('assets/webspider_logo.jpg', height: 100),
+                            child: Image.asset('assets/studio_logo_white.png', height: 100),
                           ),
                         ),
                         const SizedBox(height: 8),
@@ -119,23 +185,21 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
                   // Player Count
                   Text('Mode', style: GoogleFonts.outfit(fontSize: 14, color: AppColors.textSecondary, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 12),
-                  Row(
+                  Wrap(
+                    spacing: 12, runSpacing: 12,
                     children: [
                       _choiceChip('Solo', _players == 1, () => setState(() => _players = 1)),
-                      const SizedBox(width: 12),
-                      _choiceChip('Multiplayer', _players > 1, () => setState(() => _players = 2)),
+                      _choiceChip('Local Multiplayer', _players == 2 && !_isOnline, () {
+                        setState(() {
+                          _players = 2;
+                          _isOnline = false;
+                        });
+                      }),
+                      _choiceChip('Online Multiplayer', _isOnline, () {
+                        context.go('/multiplayer');
+                      }),
                     ],
                   ),
-                  if (_players > 1) ...[
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                         _choiceChip('Online', _isOnline, () => setState(() => _isOnline = true)),
-                         const SizedBox(width: 12),
-                         _choiceChip('Offline', !_isOnline, () => setState(() => _isOnline = false)),
-                      ],
-                    ),
-                  ],
                   
                   const SizedBox(height: 24),
                   

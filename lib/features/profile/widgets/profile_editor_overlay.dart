@@ -1,0 +1,401 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:aqua_sort/core/theme/app_colors.dart';
+import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
+import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
+import 'package:aqua_sort/features/profile/widgets/profile_otp_overlay.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:country_code_picker/country_code_picker.dart';
+import 'package:aqua_sort/core/router/app_router.dart';
+
+class ProfileEditorOverlay extends ConsumerStatefulWidget {
+  const ProfileEditorOverlay({super.key});
+
+  @override
+  ConsumerState<ProfileEditorOverlay> createState() => _ProfileEditorOverlayState();
+}
+
+class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
+  late TextEditingController _firstController;
+  late TextEditingController _lastController;
+  late TextEditingController _emailController;
+  late TextEditingController _phoneController;
+  String _countryCode = '+91';
+  
+  bool _isEditing = false;
+  int _avatarIdx = 0;
+  final List<String> _avatars = [
+    'https://img.freepik.com/free-vector/hacker-operating-laptop-cartoon-icon-illustration-technology-business-icon-concept-isolated-flat-cartoon_138676-2387.jpg',
+    'https://img.freepik.com/free-vector/cyborg-woman-head_1308-46639.jpg',
+    'https://img.freepik.com/free-vector/astronaut-meditating-cartoon-illustration_138676-3243.jpg',
+    'https://img.freepik.com/free-vector/cute-robot-waving-hand-cartoon-character_138676-3144.jpg',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    final user = ref.read(authProvider).user;
+    _firstController = TextEditingController(text: user?.firstName ?? '');
+    _lastController = TextEditingController(text: user?.lastName ?? '');
+    _emailController = TextEditingController(text: user?.email ?? '');
+    _phoneController = TextEditingController(text: user?.phone ?? '');
+    
+    if (user?.avatarUrl != null) {
+      _avatarIdx = _avatars.indexOf(user!.avatarUrl!).clamp(0, _avatars.length - 1);
+    }
+  }
+
+  void _saveBasic() {
+    ref.read(authProvider.notifier).updateProfile(
+      firstName: _firstController.text,
+      lastName: _lastController.text,
+      avatarUrl: _avatars[_avatarIdx],
+    );
+    setState(() => _isEditing = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+    );
+  }
+
+  void _changeAvatar() {
+    setState(() {
+      _avatarIdx = (_avatarIdx + 1) % _avatars.length;
+    });
+  }
+
+  void _triggerVerifyFull({VoidCallback? onVerifiedOverride}) {
+    showDialog(
+      context: context,
+      builder: (_) => ProfileOtpOverlay(
+        email: _emailController.text,
+        phone: '$_countryCode ${_phoneController.text}',
+        onVerified: onVerifiedOverride ?? () {
+          ref.read(authProvider.notifier).updateEmail(_emailController.text);
+          ref.read(authProvider.notifier).updatePhone('$_countryCode ${_phoneController.text}');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Security info updated across all channels!'), backgroundColor: Colors.green),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final oldPassController = TextEditingController();
+        final passController = TextEditingController();
+        final confirmController = TextEditingController();
+        bool isValid = false;
+
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            void updateState() {
+              setDialogState(() {
+                isValid = oldPassController.text.isNotEmpty &&
+                          passController.text.length >= 6 && 
+                          passController.text == confirmController.text &&
+                          passController.text != oldPassController.text;
+              });
+            }
+
+            return AlertDialog(
+              backgroundColor: AppColors.deepNavy,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24), side: const BorderSide(color: Colors.white10)),
+              title: Text('CHANGE PASSWORD', style: GoogleFonts.righteous(color: Colors.white, letterSpacing: 1.5)),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AquaField(label: 'Old Password', hint: 'Enter current password', controller: oldPassController, obscure: true, onChanged: (_) => updateState()),
+                    const Divider(color: Colors.white10, height: 32),
+                    AquaField(label: 'New Password', hint: 'Min 6 characters', controller: passController, obscure: true, onChanged: (_) => updateState()),
+                    AquaField(label: 'Confirm Password', hint: 'Must match', controller: confirmController, obscure: true, onChanged: (_) => updateState()),
+                    if (passController.text.isNotEmpty && confirmController.text.isNotEmpty && passController.text != confirmController.text)
+                      const Text('Passwords do not match', style: TextStyle(color: Colors.redAccent, fontSize: 12)),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+                Opacity(
+                  opacity: isValid ? 1.0 : 0.4,
+                  child: TextButton(
+                    onPressed: isValid ? () async {
+                      final oldPass = oldPassController.text;
+                      final newPass = passController.text;
+                      
+                      // 1. Verify old password first
+                      final isOldCorrect = await ref.read(authProvider.notifier).verifyOldPassword(oldPass);
+                      
+                      if (!isOldCorrect) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Incorrect old password.'), backgroundColor: Colors.redAccent),
+                          );
+                        }
+                        return;
+                      }
+
+                      // 2. If correct, proceed with OTP
+                      if (context.mounted) Navigator.pop(ctx);
+                      _triggerVerifyFull(
+                        onVerifiedOverride: () async {
+                          try {
+                            // Perform the update first
+                            await ref.read(authProvider.notifier).updatePassword(newPass);
+                            
+                            // Use routerProvider to avoid context/mounting issues
+                            final router = ref.read(routerProvider);
+                            
+                            if (context.mounted) {
+                              // Close the Profile Editor overlay
+                              Navigator.of(context).pop();
+                            }
+                            
+                            // Force navigate to success screen
+                            router.go('/success', extra: {
+                              'title': 'Success!',
+                              'message': 'Your password has been changed successfully.',
+                            });
+                          } catch (e) {
+                            if (context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.toString().contains('same_password') 
+                                  ? 'New password must be different from the old one.' 
+                                  : 'Failed to update password: $e'), backgroundColor: Colors.redAccent),
+                              );
+                            }
+                          }
+                        }
+                      );
+                    } : null,
+                    child: const Text('VERIFY & UPDATE', style: TextStyle(color: AppColors.cyanGlow)),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDeleteConfirm() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final confirmController = TextEditingController();
+        return AlertDialog(
+          backgroundColor: AppColors.deepNavy,
+          title: Text('DELETE ACCOUNT?', style: GoogleFonts.righteous(color: Colors.redAccent)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('This action is permanent and cannot be undone.', 
+                style: TextStyle(color: Colors.white70)),
+              const SizedBox(height: 20),
+              const Text('Type "DELETE" to confirm:', style: TextStyle(color: Colors.white54, fontSize: 12)),
+              TextField(
+                controller: confirmController,
+                style: const TextStyle(color: Colors.white),
+                decoration: const InputDecoration(focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: Colors.redAccent))),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('CANCEL')),
+            TextButton(
+              onPressed: () {
+                if (confirmController.text == 'DELETE') {
+                  ref.read(authProvider.notifier).deleteAccount();
+                  Navigator.pop(ctx); 
+                  Navigator.pop(context);
+                }
+              }, 
+              child: const Text('CONFIRM DELETION', style: TextStyle(color: Colors.redAccent))
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.deepNavy,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        border: Border.all(color: Colors.white10),
+      ),
+      padding: const EdgeInsets.only(left: 24, right: 24, top: 24, bottom: 40),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('MY PROFILE', style: GoogleFonts.righteous(fontSize: 24, color: Colors.white, letterSpacing: 2)),
+                IconButton(icon: const Icon(Icons.close, color: Colors.white54), onPressed: () => Navigator.pop(context)),
+              ],
+            ),
+            const Divider(color: Colors.white10, height: 40),
+            
+            // ── Avatar Section ──────────────────────────────────────────────
+            Center(
+              child: Column(
+                children: [
+                  Stack(
+                    children: [
+                      Container(
+                        width: 100, height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: AppColors.cyanGlow, width: 2),
+                          boxShadow: [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.2), blurRadius: 20)],
+                        ),
+                        child: ClipOval(child: Image.network(_avatars[_avatarIdx], fit: BoxFit.cover)),
+                      ),
+                      if (_isEditing)
+                         Positioned(
+                           right: 0, bottom: 0,
+                           child: GestureDetector(
+                             onTap: _changeAvatar,
+                             child: Container(
+                               padding: const EdgeInsets.all(8),
+                               decoration: const BoxDecoration(color: AppColors.cyanGlow, shape: BoxShape.circle),
+                               child: const Icon(Icons.camera_alt, color: Colors.black87, size: 16),
+                             ),
+                           ),
+                         ).animate().scale(curve: Curves.easeOutBack),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  GlowButton(
+                    label: _isEditing ? 'SAVE CHANGES' : 'EDIT MY PROFILE',
+                    outlined: !_isEditing,
+                    onTap: () {
+                      if (_isEditing) {
+                        _saveBasic();
+                      } else {
+                        setState(() => _isEditing = true);
+                      }
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 32),
+
+            _sectionTitle('PERSONAL INFORMATION'),
+            Row(
+              children: [
+                Expanded(child: AquaField(label: 'First Name', hint: 'First Name', controller: _firstController, enabled: _isEditing)),
+                const SizedBox(width: 12),
+                Expanded(child: AquaField(label: 'Last Name', hint: 'Last Name', controller: _lastController, enabled: _isEditing)),
+              ],
+            ),
+            
+            const SizedBox(height: 32),
+            _sectionTitle('CONTACT DETAILS'),
+            AquaField(label: 'Email Address', hint: 'email@example.com', controller: _emailController, enabled: _isEditing, suffix: const Icon(Icons.email_outlined, size: 16, color: Colors.white24)),
+            
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  height: 46,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: _isEditing ? AppColors.inputBg : AppColors.inputBg.withOpacity(0.4),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: _isEditing ? AppColors.inputBorder : AppColors.inputBorder.withOpacity(0.2)),
+                  ),
+                  child: CountryCodePicker(
+                    enabled: _isEditing,
+                    onChanged: (c) => setState(() => _countryCode = c.dialCode!),
+                    initialSelection: 'IN',
+                    favorite: const ['+91', 'IN'],
+                    textStyle: GoogleFonts.outfit(color: _isEditing ? Colors.white : Colors.white24, fontSize: 13),
+                    showCountryOnly: false,
+                    showOnlyCountryWhenClosed: false,
+                    alignLeft: false,
+                    padding: EdgeInsets.zero,
+                    // Enable Search
+                    showDropDownButton: true,
+                    searchDecoration: InputDecoration(
+                      hintText: 'Search country...',
+                      hintStyle: const TextStyle(color: Colors.white24),
+                      fillColor: AppColors.deepNavy,
+                      filled: true,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.white10)),
+                    ),
+                    searchStyle: const TextStyle(color: Colors.white),
+                    dialogBackgroundColor: AppColors.deepNavy,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(child: AquaField(label: 'Phone Number', hint: 'Mobile', controller: _phoneController, enabled: _isEditing)),
+              ],
+            ),
+
+            if (_isEditing)
+               Align(
+                 alignment: Alignment.centerRight,
+                 child: TextButton.icon(
+                   icon: const Icon(Icons.shield_outlined, size: 16, color: AppColors.cyanGlow),
+                   label: const Text('SECURE UPDATE (EMAIL + PHONE)', style: TextStyle(color: AppColors.cyanGlow, fontSize: 12)),
+                   onPressed: _triggerVerifyFull,
+                 ),
+               ).animate().fadeIn().moveY(begin: 10, end: 0),
+            
+            const SizedBox(height: 32),
+            _sectionTitle('SECURITY'),
+            GlowButton(
+              label: 'CHANGE PASSWORD',
+              outlined: true,
+              icon: Icons.lock_outline,
+              onTap: _showChangePasswordDialog,
+            ),
+
+            const SizedBox(height: 60),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('DANGER ZONE', style: GoogleFonts.righteous(color: Colors.redAccent, fontSize: 16, letterSpacing: 1.5)),
+                  const SizedBox(height: 8),
+                  const Text('Permanently remove your account and all associated data from our servers.', 
+                    style: TextStyle(color: Colors.white54, fontSize: 13)),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: _showDeleteConfirm, 
+                    child: Text('DELETE MY ACCOUNT', style: GoogleFonts.outfit(color: Colors.redAccent, fontWeight: FontWeight.bold))
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16.0),
+      child: Text(title, style: GoogleFonts.outfit(color: AppColors.tealAccent, fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+    );
+  }
+}

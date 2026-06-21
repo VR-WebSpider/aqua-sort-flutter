@@ -8,6 +8,7 @@ import 'package:aqua_sort/features/auth/widgets/floating_tube.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
+import 'package:aqua_sort/features/auth/widgets/aqua_error_dialog.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -29,13 +30,13 @@ class _SplashState extends ConsumerState<SplashScreen> with TickerProviderStateM
     final size = MediaQuery.of(context).size;
     return Scaffold(
       body: Stack(children: [
-        // â”€â”€ Background â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Background ────────────────────────────────
         aquaBackground(),
 
-        // â”€â”€ Bubbles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Bubbles ───────────────────────────────────
         ..._bubbles(size),
 
-        // â”€â”€ Floating tubes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Floating tubes ────────────────────────────
         AnimatedBuilder(animation: _floatAnim, builder: (_, __) {
           final dy = _floatAnim.value * 14;
           return Stack(children: [
@@ -45,14 +46,14 @@ class _SplashState extends ConsumerState<SplashScreen> with TickerProviderStateM
           ]);
         }),
 
-        // â”€â”€ Waves â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Waves ─────────────────────────────────────
         Positioned(bottom: 0, left: 0, right: 0, height: size.height * 0.62,
           child: AnimatedBuilder(
             animation: _wave,
             builder: (_, __) => CustomPaint(painter: WavePainter(_wave.value)),
           )),
 
-        // â”€â”€ Content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Content ───────────────────────────────────
         FadeTransition(opacity: _fadeAnim, child: _content(context, size)),
       ]),
     );
@@ -83,52 +84,66 @@ class _SplashState extends ConsumerState<SplashScreen> with TickerProviderStateM
     });
   }
 
-  Widget _content(BuildContext ctx, Size size) {
-    return SafeArea(child: Column(children: [
-      const Spacer(flex: 2),
+  Widget _content(BuildContext context, Size size) {
+    return SafeArea(
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            const SizedBox(height: 60),
+            // Logo
+            Image.asset(
+              'assets/studio_logo_white.png',
+              width: 220,
+              height: 220,
+              errorBuilder: (context, error, stackTrace) => const Icon(Icons.rocket_launch, size: 80, color: Colors.white24),
+            ),
+            const SizedBox(height: 28),
 
-      // Logo
-      ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: Container(
-          decoration: BoxDecoration(
-            boxShadow: [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.3), blurRadius: 40)],
-          ),
-          child: Image.asset('assets/webspider_logo.jpg', height: 120),
+            // Title
+            Text('Aqua Sort',
+              style: GoogleFonts.righteous(
+                fontSize: 64, color: Colors.white,
+                shadows: [
+                  const Shadow(color: AppColors.cyanGlow, blurRadius: 28, offset: Offset(0, 2)),
+                  const Shadow(color: AppColors.cyanGlow, blurRadius: 60),
+                ],
+              )),
+            const SizedBox(height: 6),
+            Text('by WebSpider Studios',
+              style: GoogleFonts.righteous(
+                  fontSize: 14, color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w300, letterSpacing: 3)),
+
+            const SizedBox(height: 40),
+
+            // Buttons
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: size.width * 0.1),
+              child: Column(children: [
+                GlowButton(
+                  label: 'Play as Guest', 
+                  outlined: true,
+                  loading: ref.watch(authProvider).isLoading,
+                  onTap: () async {
+                    try {
+                      await ref.read(authProvider.notifier).setGuest();
+                    } catch (e) {
+                      if (context.mounted) {
+                        AquaErrorDialog.show(context, e);
+                      }
+                    }
+                  },
+                ),
+                const SizedBox(height: 14),
+                GlowButton(label: 'Secure Login', icon: Icons.lock_outline,
+                    onTap: () => context.go('/login')),
+              ]),
+            ),
+
+            const SizedBox(height: 60),
+          ],
         ),
       ),
-      const SizedBox(height: 28),
-
-      // Title
-      Text('Aqua Sort',
-        style: GoogleFonts.righteous(
-          fontSize: 64, color: Colors.white,
-          shadows: [
-            const Shadow(color: AppColors.cyanGlow, blurRadius: 28, offset: Offset(0, 2)),
-            const Shadow(color: AppColors.cyanGlow, blurRadius: 60),
-          ],
-        )),
-      const SizedBox(height: 6),
-      Text('by WebSpider Studios',
-        style: GoogleFonts.righteous(
-            fontSize: 14, color: AppColors.textSecondary,
-            fontWeight: FontWeight.w300, letterSpacing: 3)),
-
-      const Spacer(flex: 3),
-
-      // Buttons
-      Padding(
-        padding: EdgeInsets.symmetric(horizontal: size.width * 0.1),
-        child: Column(children: [
-          GlowButton(label: 'Play as Guest', outlined: true,
-              onTap: () => ref.read(authProvider.notifier).setGuest()),
-          const SizedBox(height: 14),
-          GlowButton(label: 'Secure Login', icon: Icons.lock_outline,
-              onTap: () => ctx.go('/login')),
-        ]),
-      ),
-
-      SizedBox(height: size.height * 0.15),
-    ]));
+    );
   }
 }

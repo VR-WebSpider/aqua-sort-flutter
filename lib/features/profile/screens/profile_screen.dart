@@ -8,7 +8,6 @@ import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
 import 'package:aqua_sort/features/history/providers/history_provider.dart';
 import 'package:aqua_sort/features/profile/providers/settings_provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:aqua_sort/features/profile/widgets/profile_editor_overlay.dart';
 
@@ -19,9 +18,6 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final auth = ref.watch(authProvider);
     final user = auth.user;
-    final history = ref.watch(historyProvider);
-    final progress = ref.watch(levelProvider);
-    final settings = ref.watch(settingsProvider);
 
     return Scaffold(
       body: aquaBackground(
@@ -71,6 +67,14 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 48),
+                _profileItem(Icons.person_outline, 'My Profile', onTap: () {
+                  showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => const ProfileEditorOverlay(),
+                  );
+                }),
                 _profileItem(Icons.history_outlined, 'Game History', onTap: () => _showHistory(context)),
                 _profileItem(Icons.emoji_events_outlined, 'Achievements', onTap: () => _showAchievements(context)),
                 _profileItem(Icons.settings_outlined, 'Settings', onTap: () => _showSettings(context)),
@@ -191,21 +195,6 @@ class ProfileScreen extends ConsumerWidget {
         final settings = ref.watch(settingsProvider);
         return Column(
           children: [
-            GlowButton(
-              label: 'MY PROFILE',
-              icon: Icons.person_outline,
-              onTap: () {
-                Navigator.pop(context); // Close Settings
-                showModalBottomSheet(
-                  context: context,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => const ProfileEditorOverlay(),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            const Divider(color: Colors.white10),
             _settingToggle('Background Music', settings.musicEnabled, () => ref.read(settingsProvider.notifier).toggleMusic()),
             _settingToggle('Sound Effects', settings.sfxEnabled, () => ref.read(settingsProvider.notifier).toggleSfx()),
             _settingToggle('Haptic Feedback', settings.hapticsEnabled, () => ref.read(settingsProvider.notifier).toggleHaptics()),
@@ -222,7 +211,7 @@ class ProfileScreen extends ConsumerWidget {
          title: Text(title, style: GoogleFonts.outfit(color: Colors.white)),
          value: val,
          onChanged: (_) => onToggle(),
-         activeColor: AppColors.cyanGlow,
+         activeThumbColor: AppColors.cyanGlow,
          contentPadding: EdgeInsets.zero,
        ),
      );
@@ -267,7 +256,7 @@ class ProfileScreen extends ConsumerWidget {
       barrierLabel: title,
       barrierColor: Colors.black.withOpacity(0.8),
       transitionDuration: const Duration(milliseconds: 300),
-      pageBuilder: (context, _, __) {
+      pageBuilder: (context, _, _) {
         return Center(
           child: Container(
             margin: const EdgeInsets.all(22),

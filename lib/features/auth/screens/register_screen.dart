@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
-import 'dart:io';
+import 'package:flutter/foundation.dart';
+import 'dart:io' show File;
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:country_code_picker/country_code_picker.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
+import 'package:aqua_sort/features/auth/screens/legal_screen.dart';
 
-class RegisterScreen extends StatefulWidget {
+class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
-  @override State<RegisterScreen> createState() => _RegisterState();
+  @override ConsumerState<RegisterScreen> createState() => _RegisterState();
 }
 
-class _RegisterState extends State<RegisterScreen> {
+class _RegisterState extends ConsumerState<RegisterScreen> {
   final _form      = GlobalKey<FormState>();
   final _firstName   = TextEditingController();
   final _lastName    = TextEditingController();
@@ -23,7 +27,47 @@ class _RegisterState extends State<RegisterScreen> {
   String _countryCode = '+1';
   bool _showPass = false;
   bool _isPublic = false;
-  File? _avatar;
+  bool _agreed   = false;
+  XFile? _avatar;
+
+  final String _privacyText = """
+PRIVACY POLICY
+Last Updated: April 14, 2026
+
+WebSpider Studios is committed to protecting your privacy.
+
+1. Information We Collect:
+- Core Identity: Email Address and Phone Number (optional).
+- Game Status: Coin balance, owned skins, and leaderboard scores.
+- Security Logs: Verification attempts and challenges.
+
+2. Security:
+Any changes to your core identity are gated by our 'Zero Casualization' security protocol.
+
+3. Data Storage:
+Store using Supabase with enterprise-grade encryption and RLS.
+
+Contact: webspiderstudios@gmail.com
+""";
+
+  final String _eulaText = """
+USER AGREEMENT (EULA)
+Last Updated: April 14, 2026
+
+1. License Grant:
+Personal, non-exclusive license to play Aqua Sort for entertainment.
+
+2. Account Security:
+You are responsible for your credentials and agree to the 'Zero Casualization' security requirements.
+
+3. Virtual Goods:
+Coins and Skins have no real-world monetary value.
+
+4. Fair Play:
+Cheating or exploiting results in account termination.
+
+Contact: webspiderstudios@gmail.com
+""";
 
   @override
   void dispose() { 
@@ -38,7 +82,16 @@ class _RegisterState extends State<RegisterScreen> {
 
   Future<void> _pickImage() async {
     final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 80);
-    if (picked != null) setState(() => _avatar = File(picked.path));
+    if (picked != null) setState(() => _avatar = picked);
+  }
+
+  void _showLegal(String title, String content) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => LegalScreen(title: title, content: content),
+      ),
+    );
   }
 
   @override
@@ -58,7 +111,7 @@ class _RegisterState extends State<RegisterScreen> {
               Text('Join the Aqua Sort community', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(height: 22),
 
-              // â”€â”€ Avatar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              // ── Avatar ──────────────────────────────────────────────────
               Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
                 GestureDetector(
                   onTap: _pickImage,
@@ -70,7 +123,11 @@ class _RegisterState extends State<RegisterScreen> {
                       color: AppColors.inputBg,
                     ),
                     child: _avatar != null
-                        ? ClipOval(child: Image.file(_avatar!, fit: BoxFit.cover))
+                        ? ClipOval(
+                            child: kIsWeb 
+                                ? Image.network(_avatar!.path, fit: BoxFit.cover)
+                                : Image.file(File(_avatar!.path), fit: BoxFit.cover)
+                          )
                         : const Icon(Icons.person_outline, size: 36, color: AppColors.textMuted),
                   ),
                 ),
@@ -98,7 +155,7 @@ class _RegisterState extends State<RegisterScreen> {
               Text('Custom Collection', style: GoogleFonts.outfit(fontSize: 10, color: AppColors.tealMid)),
               const SizedBox(height: 16),
 
-              // â”€â”€ Fields â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              // ── Fields ──────────────────────────────────────────────────
               AquaField(label: 'First Name', hint: 'First Name', controller: _firstName,
                   lockIcon: true,
                   validator: (v) => v == null || v.length < 2 ? 'Min 2 chars' : null),
@@ -155,9 +212,22 @@ class _RegisterState extends State<RegisterScreen> {
                         favorite: const ['+1', 'US'],
                         showCountryOnly: false,
                         showOnlyCountryWhenClosed: false,
+                        hideSearch: false,
                         alignLeft: false,
                         textStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
                         dialogTextStyle: GoogleFonts.outfit(color: Colors.black, fontSize: 13),
+                        searchDecoration: InputDecoration(
+                          hintText: 'Search country...',
+                          hintStyle: GoogleFonts.outfit(fontSize: 14, color: Colors.black54),
+                          prefixIcon: const Icon(Icons.search, color: Colors.black45),
+                          filled: true,
+                          fillColor: Colors.grey.shade100,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
                       ),
                     ),
                     Expanded(
@@ -178,7 +248,7 @@ class _RegisterState extends State<RegisterScreen> {
                 const SizedBox(height: 16),
               ]),
 
-              // â”€â”€ Private/Public toggle â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+              // ── Private/Public toggle ──────────────────────────────────
               Row(children: [
                 const Icon(Icons.lock_outline, size: 15, color: AppColors.tealMid),
                 const SizedBox(width: 6),
@@ -192,17 +262,87 @@ class _RegisterState extends State<RegisterScreen> {
                   inactiveTrackColor: AppColors.inputBorder,
                 ),
               ]),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
 
-              GlowButton(label: 'Create Account', onTap: () {
-                if (_form.currentState!.validate()) {
-                  context.go('/otp', extra: {
-                    'firstName': _firstName.text,
-                    'lastName': _lastName.text,
-                    'displayName': _displayName.text,
-                  });
-                }
-              }),
+              // ── Legal Checkbox ─────────────────────────────────────────
+              Row(children: [
+                SizedBox(
+                  height: 24, width: 24,
+                  child: Checkbox(
+                    value: _agreed,
+                    onChanged: (v) => setState(() => _agreed = v ?? false),
+                    activeColor: AppColors.cyanGlow,
+                    checkColor: AppColors.deepNavy,
+                    side: const BorderSide(color: AppColors.tealMid),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: RichText(
+                    text: TextSpan(
+                      style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary),
+                      children: [
+                        const TextSpan(text: 'I agree to the '),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: GestureDetector(
+                            onTap: () => _showLegal('User Agreement', _eulaText),
+                            child: Text('User Agreement', style: GoogleFonts.outfit(color: AppColors.cyanGlow, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                        const TextSpan(text: ' and '),
+                        WidgetSpan(
+                          alignment: PlaceholderAlignment.middle,
+                          child: GestureDetector(
+                            onTap: () => _showLegal('Privacy Policy', _privacyText),
+                            child: Text('Privacy Policy', style: GoogleFonts.outfit(color: AppColors.cyanGlow, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ]),
+              const SizedBox(height: 24),
+
+              GlowButton(
+                label: 'Create Account', 
+                loading: ref.watch(authProvider).isLoading,
+                onTap: () async {
+                  if (!_agreed) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Please agree to the terms first'), backgroundColor: Colors.orangeAccent),
+                    );
+                    return;
+                  }
+                  if (_form.currentState!.validate()) {
+                    try {
+                      final fullPhone = _phone.text.isEmpty ? null : '$_countryCode${_phone.text}';
+                      await ref.read(authProvider.notifier).signUp(
+                        _email.text, 
+                        _pass.text,
+                        firstName: _firstName.text,
+                        lastName: _lastName.text,
+                        phone: fullPhone,
+                      );
+                      if (mounted) {
+                        context.go('/otp', extra: {
+                          'email': _email.text,
+                          'firstName': _firstName.text,
+                          'lastName': _lastName.text,
+                          'phone': fullPhone,
+                        });
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
+                        );
+                      }
+                    }
+                  }
+                },
+              ),
             ])),
           ),
         ),

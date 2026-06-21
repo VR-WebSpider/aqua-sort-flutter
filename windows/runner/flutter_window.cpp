@@ -36,6 +36,10 @@ bool FlutterWindow::OnCreate() {
   // window is shown. It is a no-op if the first frame hasn't completed yet.
   flutter_controller_->ForceRedraw();
 
+  // Force show the window immediately to prevent window-compositor deadlock where 
+  // hidden windows never receive frame requests.
+  this->Show();
+
   return true;
 }
 

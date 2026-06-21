@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:aqua_sort/features/game/providers/game_provider.dart';
 import 'package:aqua_sort/features/game/widgets/tube_widget.dart';
 import 'package:aqua_sort/features/game/engine/game_engine.dart';
-import 'package:aqua_sort/features/game/widgets/liquid_painter.dart';
+
+import 'package:audioplayers/audioplayers.dart';
 
 import 'package:aqua_sort/core/services/audio_service.dart';
 
@@ -32,12 +33,13 @@ class _PouringAnimationOverlayState extends State<PouringAnimationOverlay> with 
   late Animation<double> _flight;
   late Animation<double> _tilt;
   late Animation<double> _stream;
+  AudioPlayer? _audioPlayer;
 
   @override
   void initState() {
     super.initState();
     // Dynamic duration: 300 (flight) + 150 (tilt) + (count * 300) (pour) + 150 (return)
-    final int pourDuration = widget.pour.count * 300;
+    final int pourDuration = math.max(500, widget.pour.count * 300);
     final int totalDuration = 300 + 150 + pourDuration + 150;
     
     _ctrl = AnimationController(vsync: this, duration: Duration(milliseconds: totalDuration));
@@ -47,22 +49,25 @@ class _PouringAnimationOverlayState extends State<PouringAnimationOverlay> with 
     _tilt   = CurvedAnimation(parent: _ctrl, curve: Interval(300 / d, 450 / d, curve: Curves.easeIn));
     _stream = CurvedAnimation(parent: _ctrl, curve: Interval(450 / d, (450 + pourDuration) / d));
 
-    _ctrl.forward();
-    
-    // Sync sound to tilt start
-    Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted) AudioService.instance.playPour();
+    bool hasStartedPourSound = false;
+
+    _ctrl.addListener(() {
+      // Trigger sound when tilting reaches 80% (when liquid starts spilling)
+      if (!hasStartedPourSound && _tilt.value > 0.8) {
+        AudioService.instance.playPour().then((player) {
+          _audioPlayer = player;
+        });
+        hasStartedPourSound = true;
+      }
     });
 
-    // Stop sound when pouring ends
-    Future.delayed(Duration(milliseconds: 450 + pourDuration), () {
-        if (mounted) AudioService.instance.stopPour();
-    });
+    _ctrl.forward();
   }
 
   @override
   void dispose() {
     _ctrl.dispose();
+    AudioService.instance.stopPour(_audioPlayer);
     super.dispose();
   }
 
@@ -80,12 +85,14 @@ class _PouringAnimationOverlayState extends State<PouringAnimationOverlay> with 
         final sourceCurrentVolume = (sourceBaseColors.length.toDouble() - currentPoured).clamp(0.0, 4.0);
         final sourceTopFill = (sourceCurrentVolume > 0 && sourceCurrentVolume % 1.0 == 0) ? 1.0 : (sourceCurrentVolume % 1.0);
         final sourceColors = sourceBaseColors.take(sourceCurrentVolume.ceil()).toList();
+        while (sourceColors.length < 4) sourceColors.add(-1);
 
         final destBaseColors = widget.destTube.colors.where((c) => c >= 0).toList();
         final destCurrentVolume = (destBaseColors.length.toDouble() + currentPoured).clamp(0.0, 4.0);
         final destTopFill = (destCurrentVolume > 0 && destCurrentVolume % 1.0 == 0) ? 1.0 : (destCurrentVolume % 1.0);
         final List<int> destColors = [...destBaseColors];
         while (destColors.length < destCurrentVolume.ceil()) destColors.add(widget.pour.color);
+        while (destColors.length < 4) destColors.add(-1);
 
         // ── DYNAMIC TILT LOGIC ──────────────────────────────────────────────
         final bool isLeft = widget.endOffset.dx < widget.startOffset.dx;
@@ -105,29 +112,34 @@ class _PouringAnimationOverlayState extends State<PouringAnimationOverlay> with 
           children: [
             // Destination Tube
             Positioned(
+              key: const ValueKey('dest_tube_wrapper'),
               left: widget.endOffset.dx,
               top: widget.endOffset.dy,
               child: TubeWidget(
+                key: const ValueKey('dest_tube'),
                 tube: Tube(destColors),
                 selected: false,
                 onTap: () {},
                 topLayerFill: destTopFill,
                 showCap: false,
+                isReceiving: _stream.value > 0.0 && _stream.value < 1.0,
               ),
             ),
 
             // Liquid Stream
-            if (_stream.value > 0.05 && _stream.value < 0.98)
-              _buildStream(currentPos, tiltAngle, isLeft),
+            if (_stream.value > 0.0 && _stream.value < 1.0)
+              _buildStream(currentPos, tiltAngle, isLeft, destCurrentVolume),
 
             // Moving Tube
             Positioned(
+              key: const ValueKey('source_tube_wrapper'),
               left: currentPos.dx,
               top: currentPos.dy,
               child: Transform.rotate(
                 angle: tiltAngle,
                 alignment: pivot,
                 child: TubeWidget(
+                  key: const ValueKey('source_tube'),
                   tube: Tube(sourceColors), 
                   selected: false,
                   tilt: tiltAngle,
@@ -143,14 +155,19 @@ class _PouringAnimationOverlayState extends State<PouringAnimationOverlay> with 
     );
   }
 
-  Widget _buildStream(Offset currentPos, double tiltAngle, bool isLeft) {
+  Widget _buildStream(Offset currentPos, double tiltAngle, bool isLeft, double destCurrentVolume) {
     // Spout is at x=0 (left) or x=42 (right)
     final spoutX = currentPos.dx + (isLeft ? 0 : 42);
     final spoutY = currentPos.dy;
     
     // Pour into center of destination
     final destX = widget.endOffset.dx + 21;
-    final destY = widget.endOffset.dy + 8;
+    
+    // The stream goes all the way down to the destination liquid surface!
+    const double h = 130.0;
+    final double destLiquidY = widget.endOffset.dy + h - (destCurrentVolume * (h / 4.0));
+    // Clamp so it stays within the tube body and doesn't overshoot the bottom curve
+    final destY = destLiquidY.clamp(widget.endOffset.dy + 10.4, widget.endOffset.dy + h - 3.0);
 
     return CustomPaint(
       painter: _StreamPainter(
@@ -173,29 +190,53 @@ class _StreamPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
+    // 1. Draw a clean, straight glowing outer border (soft glow)
+    final Paint glowPaint = Paint()
+      ..color = color.withOpacity(0.35)
+      ..strokeWidth = 9.0
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+    
+    canvas.drawLine(from, to, glowPaint);
+
+    // 2. Draw the solid central vertical stream
+    final Paint streamPaint = Paint()
       ..color = color
-      ..strokeWidth = 5
+      ..strokeWidth = 4.8
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;
 
-    // Stream thickness pulses slightly
-    final thickness = 5.0 + (math.sin(progress * 20) * 1.0);
+    canvas.drawLine(from, to, streamPaint);
 
-    // Main stream
-    canvas.drawLine(from, to, paint..strokeWidth = thickness);
+    // 3. Draw a thin, glossy core reflection on the stream
+    final Paint corePaint = Paint()
+      ..color = Colors.white.withOpacity(0.4)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawLine(from, to, corePaint);
+
+    // 4. Draw splash/repulsion particles at the impact point (to)
+    final math.Random rand = math.Random(1337);
+    final Paint particlePaint = Paint()..style = PaintingStyle.fill;
     
-    // Outer Glow
-    canvas.drawLine(from, to, paint
-      ..color = color.withOpacity(0.4)
-      ..strokeWidth = thickness + 4
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+    for (int i = 0; i < 12; i++) {
+      final double phase = (progress * 8.0 + (i / 12.0)) % 1.0;
+      final double angle = -math.pi / 2 + (rand.nextDouble() - 0.5) * 1.5;
+      final double speed = 4.0 + rand.nextDouble() * 6.0;
       
-    // Inner core
-    canvas.drawLine(from, to, paint
-      ..color = Colors.white.withOpacity(0.5)
-      ..strokeWidth = thickness * 0.4
-      ..maskFilter = null);
+      final double px = to.dx + math.cos(angle) * speed * phase * 12;
+      final double py = to.dy + math.sin(angle) * speed * phase * 14 + 0.5 * 25.0 * phase * phase;
+      
+      final double size = (rand.nextDouble() * 2.8 + 1.0) * (1.0 - phase);
+      if (size > 0.1) {
+        particlePaint.color = color.withOpacity((1.0 - phase) * 0.85);
+        canvas.drawCircle(Offset(px, py), size, particlePaint);
+        canvas.drawCircle(Offset(px, py), size * 0.45, Paint()..color = Colors.white.withOpacity((1.0 - phase) * 0.95));
+      }
+    }
   }
 
   @override

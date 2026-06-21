@@ -89,11 +89,11 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.webspider" "\0"
+            VALUE "CompanyName", "WebSpider Studios" "\0"
             VALUE "FileDescription", "aqua_sort" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "aqua_sort" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.webspider. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 WebSpider Studios. All rights reserved." "\0"
             VALUE "OriginalFilename", "aqua_sort.exe" "\0"
             VALUE "ProductName", "aqua_sort" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"

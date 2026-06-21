@@ -32,7 +32,8 @@ class _Firework {
   final Offset pos;
   final Color color;
   final double delay;
-  _Firework(this.pos, this.color, this.delay);
+  final double sizeMult;
+  _Firework(this.pos, this.color, this.delay, this.sizeMult);
 }
 
 class _CelebrationPainter extends CustomPainter {
@@ -41,32 +42,45 @@ class _CelebrationPainter extends CustomPainter {
 
   _CelebrationPainter(this.progress) {
     final rand = math.Random(123);
-    fireworks = List.generate(15, (i) => _Firework(
+    fireworks = List.generate(20, (i) => _Firework(
       Offset(rand.nextDouble(), rand.nextDouble()),
-      [AppColors.cyanGlow, AppColors.tealAccent, Colors.yellow, Colors.orange, Colors.purpleAccent][rand.nextInt(5)],
+      [AppColors.cyanGlow, AppColors.tealAccent, Colors.yellow, Colors.orange, Colors.purpleAccent, Colors.pinkAccent][rand.nextInt(6)],
       rand.nextDouble(),
+      0.5 + rand.nextDouble(),
     ));
   }
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint();
-
     for (var fw in fireworks) {
       final double t = (progress + fw.delay) % 1.0;
-      if (t > 0.6) continue; // Explosion lifecycle
+      if (t > 0.8) continue; // Explosion lifecycle
       
-      final double burstProgress = t / 0.6;
-      final center = Offset(fw.pos.dx * size.width, fw.pos.dy * size.height);
+      final double burstProgress = t / 0.8;
+      final center = Offset(fw.pos.dx * size.width, (fw.pos.dy * size.height) + (burstProgress * 40)); // Add gravity fall
       
-      for (int i = 0; i < 12; i++) {
-        final double angle = (i / 12) * math.pi * 2;
-        final double radius = burstProgress * 60;
+      final int particleCount = (30 * fw.sizeMult).toInt();
+      for (int i = 0; i < particleCount; i++) {
+        final double angle = (i / particleCount) * math.pi * 2;
+        // Exponential expansion for "snap"
+        final double speed = (i % 3 == 0) ? 1.2 : 0.8;
+        final double radius = math.pow(burstProgress, 0.6) * 100 * speed * fw.sizeMult;
+        
         final x = center.dx + math.cos(angle) * radius;
         final y = center.dy + math.sin(angle) * radius;
         
-        paint.color = fw.color.withOpacity(1 - burstProgress);
-        canvas.drawCircle(Offset(x, y), (1 - burstProgress) * 4, paint);
+        final paint = Paint()
+          ..color = fw.color.withOpacity((1 - burstProgress).clamp(0, 1))
+          ..style = PaintingStyle.fill;
+
+        // Draw particle with glow
+        canvas.drawCircle(Offset(x, y), (1 - burstProgress) * 3 * fw.sizeMult, paint);
+        
+        if (burstProgress < 0.3) {
+           canvas.drawCircle(Offset(x, y), (1 - burstProgress) * 6 * fw.sizeMult, 
+             paint..color = fw.color.withOpacity((1 - burstProgress) * 0.3)
+             ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3));
+        }
       }
     }
   }

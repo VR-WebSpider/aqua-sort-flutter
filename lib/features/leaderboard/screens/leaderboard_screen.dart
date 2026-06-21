@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:aqua_sort/features/game/engine/game_engine.dart';
+import 'package:aqua_sort/core/services/game_services.dart';
 import '../providers/leaderboard_provider.dart';
 import '../models/score_entry.dart';
+
+import 'package:flutter_animate/flutter_animate.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
@@ -19,9 +22,8 @@ class _LeaderboardState extends ConsumerState<LeaderboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scores = ref.watch(leaderboardProvider);
-    final filtered = scores.where((s) => s.difficulty == _filter.label).toList();
-
+    final leaderboardAsync = ref.watch(leaderboardStreamProvider);
+    
     return Scaffold(
       body: aquaBackground(
         child: SafeArea(
@@ -31,37 +33,66 @@ class _LeaderboardState extends ConsumerState<LeaderboardScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AquaHeader(onBack: () => Navigator.of(context).pop()),
-                const SizedBox(height: 24),
-                Text('Global Rankings', style: GoogleFonts.outfit(
-                  fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white,
-                  shadows: [const Shadow(color: AppColors.cyanGlow, blurRadius: 15)],
-                )),
                 const SizedBox(height: 16),
                 
-                // Difficulty Filter
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: Difficulty.values.map((d) {
-                      final active = _filter == d;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: _filterChip(d.label, active, () => setState(() => _filter = d)),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                
-                const SizedBox(height: 24),
-                
-                // Leaderboard List
-                Expanded(
-                  child: filtered.isEmpty 
-                    ? _buildEmpty()
-                    : ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (context, i) => _buildEntry(filtered[i], i + 1),
+                // Live Status Indicator
+                Row(
+                  children: [
+                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle)),
+                    const SizedBox(width: 8),
+                    Text('LIVE GLOBAL SYNC', style: GoogleFonts.outfit(fontSize: 10, color: Colors.greenAccent, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  ],
+                ).animate().fadeIn(),
+                const SizedBox(height: 8),
+
+                leaderboardAsync.when(
+                  data: (scores) {
+                    final filtered = scores.where((s) => s.difficulty.toLowerCase().contains(_filter.label.toLowerCase()) || _filter == Difficulty.easy).toList();
+                    return Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildPurityProgress(scores.length),
+                          const SizedBox(height: 24),
+                          Text('Global Rankings', style: GoogleFonts.outfit(
+                            fontSize: 28, fontWeight: FontWeight.bold, color: Colors.white,
+                            shadows: [const Shadow(color: AppColors.cyanGlow, blurRadius: 15)],
+                          )).animate().fadeIn(duration: 400.ms).slideX(begin: -0.1),
+                          const SizedBox(height: 16),
+                          
+                          // Difficulty Filter
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: Difficulty.values.map((d) {
+                                final active = _filter == d;
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 8),
+                                  child: _filterChip(d.label, active, () => setState(() => _filter = d)),
+                                );
+                              }).toList(),
+                            ),
+                          ).animate().fadeIn(delay: 200.ms),
+                          
+                          const SizedBox(height: 24),
+                          
+                          Expanded(
+                            child: filtered.isEmpty 
+                              ? _buildEmpty()
+                              : ListView.builder(
+                                  itemCount: filtered.length,
+                                  itemBuilder: (context, i) => _buildEntry(filtered[i], i + 1)
+                                    .animate()
+                                    .fadeIn(delay: (50 * i).ms, duration: 400.ms)
+                                    .slideY(begin: 0.1, curve: Curves.easeOut),
+                                ),
+                          ),
+                        ],
                       ),
+                    );
+                  },
+                  loading: () => const Expanded(child: Center(child: CircularProgressIndicator(color: AppColors.cyanGlow))),
+                  error: (e, _) => Expanded(child: Center(child: Text('Sync Error: $e', style: const TextStyle(color: Colors.redAccent)))),
                 ),
               ],
             ),
@@ -69,6 +100,38 @@ class _LeaderboardState extends ConsumerState<LeaderboardScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildPurityProgress(int totalScores) {
+    final double progress = (totalScores / 100).clamp(0.0, 1.0);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+         Row(
+           mainAxisAlignment: MainAxisAlignment.spaceBetween,
+           children: [
+             Text('GLOBAL PURITY', style: GoogleFonts.righteous(fontSize: 10, color: AppColors.tealAccent, letterSpacing: 1.2)),
+             Text('${(progress * 100).toInt()}%', style: GoogleFonts.righteous(fontSize: 10, color: Colors.white70)),
+           ],
+         ),
+         const SizedBox(height: 6),
+         Stack(
+           children: [
+             Container(height: 4, decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(2))),
+             AnimatedContainer(
+               duration: 1.seconds,
+               height: 4, 
+               width: MediaQuery.of(context).size.width * 0.8 * progress,
+               decoration: BoxDecoration(
+                 color: AppColors.cyanGlow, 
+                 borderRadius: BorderRadius.circular(2),
+                 boxShadow: [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.5), blurRadius: 4)],
+               ),
+             ),
+           ],
+         ),
+      ],
+    ).animate().fadeIn(delay: 100.ms);
   }
 
   Widget _buildEntry(ScoreEntry entry, int rank) {

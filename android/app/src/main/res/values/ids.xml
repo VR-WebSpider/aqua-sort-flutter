@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Replace with your Project ID from Play Console > Grow > Play Games Services > Configuration -->
+    <string name="app_id">YOUR_PGS_APP_ID_HERE</string>
+</resources>

@@ -6,6 +6,7 @@ import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 class VerificationScreen extends ConsumerStatefulWidget {
   final Map<String, dynamic> userData;
@@ -23,11 +24,6 @@ class _VerState extends ConsumerState<VerificationScreen> with TickerProviderSta
 
   void _nav() { 
     if (mounted) {
-      ref.read(authProvider.notifier).login(
-        widget.userData['firstName'],
-        lastName: widget.userData['lastName'],
-        displayName: widget.userData['displayName'],
-      );
       context.go('/success'); 
     }
   }
@@ -47,41 +43,67 @@ class _VerState extends ConsumerState<VerificationScreen> with TickerProviderSta
           CustomPaint(size: MediaQuery.of(context).size, painter: _CircuitPainter()),
 
           Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-            // Title
+            // Title (Image 2 Ref: Neon Glow)
             AnimatedBuilder(animation: _glow, builder: (_, __) =>
               Text('Validating Purity...',
                 style: GoogleFonts.righteous(
-                  fontSize: 30,
+                  fontSize: 32,
                   foreground: Paint()
                     ..shader = LinearGradient(colors: [
-                      AppColors.cyanGlow.withOpacity(0.6 + _glow.value * 0.4),
+                      AppColors.cyanGlow.withOpacity(0.7 + _glow.value * 0.3),
+                      const Color(0xFFD400FF), // Purple neon
                       AppColors.tealAccent,
-                    ]).createShader(const Rect.fromLTWH(0, 0, 300, 50)),
-                  shadows: [Shadow(color: AppColors.cyanGlow.withOpacity(0.4 + _glow.value * 0.3), blurRadius: 22)],
+                    ]).createShader(const Rect.fromLTWH(0, 0, 320, 50)),
+                  shadows: [
+                    Shadow(color: AppColors.cyanGlow.withOpacity(0.5), blurRadius: 25),
+                    Shadow(color: const Color(0xFFD400FF).withOpacity(0.4), blurRadius: 15),
+                  ],
                 ),
               )),
-            const SizedBox(height: 36),
+            const SizedBox(height: 40),
 
-            // Rainbow progress bar
+            // Rainbow progress bar (Image 2 Ref)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 48),
+              padding: const EdgeInsets.symmetric(horizontal: 50),
               child: AnimatedBuilder(animation: _prog, builder: (_, __) =>
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: _prog.value,
-                    minHeight: 8,
-                    backgroundColor: const Color(0xFF1A3040),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Color.lerp(AppColors.cyanGlow, const Color(0xFF7B2FBE), _prog.value)!,
+                Container(
+                  height: 14,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(color: AppColors.cyanGlow.withOpacity(0.15), blurRadius: 12, spreadRadius: 1)
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: LinearProgressIndicator(
+                      value: _prog.value,
+                      backgroundColor: Colors.black26,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.transparent),
+                    ).animate().custom(
+                      duration: const Duration(seconds: 3),
+                      builder: (context, value, child) => Container(
+                        width: MediaQuery.of(context).size.width * _prog.value,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF00E5FF), Color(0xFF7B2FBE), Color(0xFFD400FF), Color(0xFF00E5FF)],
+                            stops: [0.0, 0.35, 0.7, 1.0],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 )),
             ),
             const SizedBox(height: 16),
             AnimatedBuilder(animation: _prog, builder: (_, __) =>
-              Text('${(_prog.value * 100).toInt()}%',
-                  style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 14))),
+              Text('${(_prog.value * 100).toInt()}% PURITY',
+                  style: GoogleFonts.outfit(
+                      color: AppColors.cyanGlow.withOpacity(0.8), 
+                      fontSize: 12, 
+                      letterSpacing: 2,
+                      fontWeight: FontWeight.bold))),
           ])),
         ]),
       ),

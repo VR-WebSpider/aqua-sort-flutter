@@ -1,0 +1,205 @@
+# Aqua Sort — Game Economy, Undo System & Time/Move Limits
+
+Enhance the Aqua Sort game with visible time limit + move count HUD, a gated undo system (2 free, then premium/ads), and a coin economy driven by ad watching.
+
+## User Review Required
+
+> [!IMPORTANT]
+> **No ad SDK integration** — Since `google_mobile_ads` is not in the project and requires platform-specific setup (AdMob IDs, `AndroidManifest.xml`, `Info.plist`), this plan **simulates** the ad flow with a realistic delay + confirmation dialog. When you're ready to go live with real ads, we swap the stub for the real SDK. This keeps the game fully functional and testable now.
+
+> [!WARNING]
+> **Premium status** — There's currently no `isPremium` flag on the user model. This plan adds one locally via `SharedPreferences` (with a stub "Go Premium" button). Real in-app purchase integration (RevenueCat / StoreKit) is a separate task.
+
+## Open Questions
+
+~~1. **Undo coin cost** — **30 coins per extra undo** (beyond the 2 free). ✅ Confirmed~~
+~~2. **Ad reward amount** — **15 coins per ad watched**. 2 ads ≈ 1 paid undo. ✅ Confirmed~~
+~~3. **Time limits** — Keep current values. ✅ Confirmed~~
+
+---
+
+## Proposed Changes
+
+### Game Engine — State & Economy Constants
+
+#### [MODIFY] [game_engine.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/engine/game_engine.dart)
+
+- Add `freeUndoLimit` constant (= 2) to `GameState`
+- Add `paidUndosUsed` counter to track coin-purchased undos separately
+- `GameState.canFreeUndo` → `undosUsed < freeUndoLimit && history.isNotEmpty`
+- `GameState.needsPaidUndo` → `undosUsed >= freeUndoLimit && history.isNotEmpty`
+- No changes to `GameEngine.undo()` logic itself (gating is in the provider/UI layer)
+
+---
+
+### Game Economy Constants
+
+#### [NEW] [economy_config.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/core/services/economy_config.dart)
+
+Single source of truth for all economy numbers:
+
+```dart
+class EconomyConfig {
+  static const int freeUndoLimit = 2;
+  static const int undoCoinCost = 50;
+  static const int adRewardCoins = 25;
+  static const int adCooldownSeconds = 30; // min gap between ads
+}
+```
+
+---
+
+### Ad Service (Stub)
+
+#### [NEW] [ad_service.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/core/services/ad_service.dart)
+
+- `AdService.showRewardedAd()` → simulates a 3-second ad, returns `true` on "completion"
+- Shows a branded dialog: "Watch Ad for 25 🪙?" with a countdown progress bar
+- Returns the earned coin amount on success, `null` on cancel/fail
+- Designed so the real `google_mobile_ads` can be dropped in later with zero UI changes
+
+---
+
+### Game Provider — Undo Gating & Ad Flow
+
+#### [MODIFY] [game_provider.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/providers/game_provider.dart)
+
+Current `undo()` method is ungated. Changes:
+
+1. Rename existing `undo()` → `_performUndo()` (private, always executes)
+2. New public `requestUndo(int playerIdx, BuildContext context)`:
+   - If `undosUsed < 2` → call `_performUndo()` directly (free)
+   - If `undosUsed >= 2`:
+     - Check `isPremium` → unlimited undos, call `_performUndo()`
+     - Check if player has `>= 50 coins` → show "Use 50 coins?" confirmation → deduct & undo
+     - Otherwise → show "Watch Ad or Go Premium" bottom sheet
+3. New `rewardAdCoins(BuildContext context)`:
+   - Calls `AdService.showRewardedAd()`
+   - On success, awards `25 coins` via `LevelNotifier.awardCoins()`
+
+---
+
+### Board Widget — HUD with Timer, Moves Left & Undo Button
+
+#### [MODIFY] [board_widget.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/widgets/board_widget.dart)
+
+Current stats header shows only "Moves" and "Time" pills. Changes:
+
+1. **Replace** existing stats row with a 3-pill HUD:
+   - ⏱️ **Time Left** — `mm:ss` countdown with color warning (amber < 30s, red < 10s)
+   - 🎯 **Moves Left** — decrements, color warning (amber < 10, red < 5)
+   - 🔄 **Undo button** — shows remaining free undos badge (`2`, `1`, `0`)
+
+2. **Undo button** behavior:
+   - Tap → calls `gameProvider.requestUndo()`
+   - Badge shows free undos remaining (green = 2, amber = 1, red = 0)
+   - When `0` free undos remain, badge shows 🔒 icon
+   - Disabled (grayed out) when `history.isEmpty`
+
+3. **Lost overlay** — when time runs out OR moves depleted:
+   - Shows "Time's Up!" or "No Moves Left!" message
+   - "Watch Ad for +5 Moves" / "Watch Ad for +30s" option
+   - "Retry" button
+
+---
+
+### Premium Status Provider
+
+#### [NEW] [premium_provider.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/profile/providers/premium_provider.dart)
+
+- Simple `StateNotifier<bool>` backed by `SharedPreferences`
+- `isPremium` getter
+- `setPremium(bool)` — stub for IAP integration
+- Used by undo gating logic to grant unlimited undos
+
+---
+
+### Undo Gate Dialog Widget
+
+#### [NEW] [undo_gate_sheet.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/widgets/undo_gate_sheet.dart)
+
+Bottom sheet with 3 options when free undos exhausted:
+
+```
+┌──────────────────────────────────────┐
+│  ⚡ Extra Undo Required              │
+│                                      │
+│  You've used your 2 free undos.      │
+│                                      │
+│  [🪙 Use 50 Coins]     ← if >= 50   │
+│  [📺 Watch Ad]          ← always    │
+│  [⭐ Go Premium]        ← always    │
+│                                      │
+│  Balance: 125 🪙                     │
+└──────────────────────────────────────┘
+```
+
+- Returns an `UndoGateResult` enum: `usedCoins`, `watchedAd`, `goPremium`, `cancelled`
+- If `usedCoins`: deducts 50 coins, then performs undo
+- If `watchedAd`: shows ad → awards 25 coins → if now >= 50, auto-deduct and undo; else show "Need more coins" 
+- If `goPremium`: navigates to premium screen (stub)
+
+---
+
+### Game Over Enhancements
+
+#### [MODIFY] [game_screen.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/screens/game_screen.dart)
+
+- Listen for `lost` state → show a "Game Over" overlay with:
+  - "Time's Up!" or "No Moves Left!" message
+  - "🔄 Retry" button
+  - "📺 Watch Ad for Extra Time/Moves" button (grants +30s or +5 moves)
+  - "🏠 Home" button
+
+---
+
+## File Summary
+
+| File | Action | Purpose |
+|------|--------|---------|
+| `economy_config.dart` | **NEW** | Centralized economy constants |
+| `ad_service.dart` | **NEW** | Simulated ad service (swappable for real SDK) |
+| `premium_provider.dart` | **NEW** | Premium status provider |
+| `undo_gate_sheet.dart` | **NEW** | Undo purchase bottom sheet |
+| `game_engine.dart` | MODIFY | Add `freeUndoLimit`, `canFreeUndo`, `needsPaidUndo` |
+| `game_provider.dart` | MODIFY | Gated undo logic, ad reward flow |
+| `board_widget.dart` | MODIFY | Timer/Moves countdown HUD + undo button |
+| `game_screen.dart` | MODIFY | Game over overlay with ad/retry options |
+
+---
+
+## Economy Balance Sheet
+
+| Action | Coins |
+|--------|-------|
+| Complete a level (base) | +30 |
+| Moves efficiency bonus | +10 to +30 |
+| Speed bonus | +10 to +30 |
+| Milestone bonus (every 5th level) | +50 |
+| Watch an ad | +25 |
+| Daily login claim | +50 |
+| Extra undo (beyond 2 free) | -50 |
+| Skin purchase (standard) | -500 |
+| Skin purchase (premium) | -1500 |
+| Skin purchase (legendary) | -3000 |
+
+**Player earns ~30-90 coins/level + 25/ad. An extra undo costs 50 coins (≈ 1 level or 2 ads). This makes undos accessible but not free, encouraging strategic play.**
+
+---
+
+## Verification Plan
+
+### Automated Tests
+- `flutter analyze` — zero errors
+- Manual play-through: verify timer counts down, moves decrement, undo badge updates
+- Verify undo gating: 2 free undos → gate triggers on 3rd
+- Verify coin deduction on paid undo
+- Verify ad stub awards coins correctly
+
+### Manual Verification
+- Play Level 1-3 and confirm HUD displays correctly
+- Exhaust 2 free undos, verify gate bottom sheet appears
+- Watch simulated ad, verify coins awarded
+- Use coins for extra undo, verify deduction
+- Let timer expire, verify game over overlay appears
+- Run out of moves, verify game over overlay appears

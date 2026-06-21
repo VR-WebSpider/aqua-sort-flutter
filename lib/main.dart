@@ -4,14 +4,30 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_colors.dart';
 import 'core/router/app_router.dart';
+import 'features/profile/providers/settings_provider.dart';
+
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() async {
+  debugPrint('APP STARTING');
+  // usePathUrlStrategy();
   WidgetsFlutterBinding.ensureInitialized();
-  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  
+  try {
+    await Supabase.initialize(
+      url: 'https://zpwwjdiwcucwfuzyuiqu.supabase.co',
+      anonKey: 'sb_publishable_RshKP0PKYrNinhh8xcKuqA_3CjMiKhq',
+    );
+  } catch (e) {
+    debugPrint('Supabase init skipped: $e');
+  }
+
+  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
   ));
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   runApp(const ProviderScope(child: AquaSortApp()));
 }
 
@@ -20,6 +36,8 @@ class AquaSortApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Initialize settings to apply audio preferences immediately
+    ref.watch(settingsProvider);
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Aqua Sort',

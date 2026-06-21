@@ -5,6 +5,7 @@ import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -35,7 +36,7 @@ class _LoginState extends ConsumerState<LoginScreen> {
                   children: [
                     ClipRRect(
                       borderRadius: BorderRadius.circular(20),
-                      child: Image.asset('assets/webspider_logo.jpg', height: 80),
+                      child: Image.asset('assets/studio_logo_white.png', height: 80),
                     ),
                     const SizedBox(height: 4),
                     Text('WebSpider Studios', 
@@ -51,35 +52,16 @@ class _LoginState extends ConsumerState<LoginScreen> {
               Text('Welcome back, Sorter', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(height: 24),
 
-              // Method selector
-              Row(children: ['User ID','email','phone'].map((m) {
-                final active = _method == m;
-                return GestureDetector(
-                  onTap: () => setState(() => _method = m),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20),
-                      color: active ? AppColors.tealAccent.withOpacity(0.2) : AppColors.inputBg,
-                      border: Border.all(color: active ? AppColors.tealAccent : AppColors.inputBorder),
-                    ),
-                    child: Text(m,
-                        style: GoogleFonts.outfit(
-                            fontSize: 12, fontWeight: FontWeight.w600,
-                            color: active ? AppColors.cyanGlow : AppColors.textMuted)),
-                  ),
-                );
-              }).toList()),
-              const SizedBox(height: 18),
-
-              AquaField(label: _method == 'phone' ? 'Phone Number' : _method == 'email' ? 'Email' : 'User ID',
-                  hint: _method == 'User ID' ? 'Username/email/phone' : 'Enter your $_method', controller: _id,
-                  keyboardType: _method == 'email' ? TextInputType.emailAddress
-                      : _method == 'phone' ? TextInputType.phone : TextInputType.text,
-                  lockIcon: true,
-                  validator: (v) => v == null || v.isEmpty ? 'Required' : null),
+              const SizedBox(height: 24),
+              
+              AquaField(
+                label: 'User ID / Email',
+                hint: 'Enter username/email /phone',
+                controller: _id,
+                keyboardType: TextInputType.text,
+                lockIcon: true,
+                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+              ),
 
               AquaField(label: 'Password', hint: 'Enter password',
                   controller: _pass, obscure: !_showPass, lockIcon: true,
@@ -91,17 +73,36 @@ class _LoginState extends ConsumerState<LoginScreen> {
                   validator: (v) => v == null || v.length < 6 ? 'Min 6 chars' : null),
 
               const SizedBox(height: 8),
-              GlowButton(label: 'Sign In & Play', icon: Icons.arrow_forward_rounded, onTap: () {
+              GlowButton(
+                label: 'Sign In & Play', 
+                icon: Icons.arrow_forward_rounded, 
+                loading: ref.watch(authProvider).isLoading,
+                onTap: () async {
                 if (_form.currentState!.validate()) {
-                  ref.read(authProvider.notifier).login(
-                    _id.text,
-                    lastName: 'Sorter',
-                    displayName: _id.text,
-                  );
-                  context.go('/lobby');
+                  try {
+                    await ref.read(authProvider.notifier).login(_id.text, _pass.text);
+                    if (mounted) context.go('/lobby');
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Login failed: ${e.toString()}'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
                 }
               }),
-              const SizedBox(height: 18),
+              const SizedBox(height: 12),
+
+              Align(
+                alignment: Alignment.centerRight,
+                child: GestureDetector(
+                  onTap: () => context.push('/forgot-password'),
+                  child: Text('Forgot Password?', 
+                    style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+                ),
+              ),
+
+              const SizedBox(height: 24),
 
               Center(child: GestureDetector(
                 onTap: () => context.go('/register'),

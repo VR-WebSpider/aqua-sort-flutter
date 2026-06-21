@@ -1,0 +1,49 @@
+# Aqua Sort — Game Economy & Undo System Walkthrough
+
+## Summary
+
+Implemented a complete game economy system with time limits, move counts, gated undo (2 free, then paid), ad rewards, and loss recovery.
+
+## New Files
+
+| File | Purpose |
+|------|---------|
+| [economy_config.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/core/services/economy_config.dart) | Single source of truth for all economy constants |
+| [ad_service.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/core/services/ad_service.dart) | Simulated rewarded ad with branded dialog (swappable for real SDK) |
+| [premium_provider.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/profile/providers/premium_provider.dart) | Premium status provider (SharedPreferences-backed stub) |
+| [undo_gate_sheet.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/widgets/undo_gate_sheet.dart) | Bottom sheet with 3 options: coins, ads, or premium |
+
+## Modified Files
+
+### [game_engine.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/engine/game_engine.dart)
+- Added `canFreeUndo`, `needsPaidUndo`, `freeUndosLeft` getters
+- Added `withBonusTime()` and `withBonusMoves()` factory helpers for loss recovery
+
+### [game_provider.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/providers/game_provider.dart)
+- Split `undo()` into private `_performUndo()` + public `requestUndo()` with gating
+- `requestUndo()` flow: free → premium check → bottom sheet (coins/ad/premium)
+- Added `grantBonusTime()`, `grantBonusMoves()`, `rewardAdCoins()` methods
+
+### [board_widget.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/widgets/board_widget.dart)
+- Replaced old "Moves" / "Time" pills with purpose-built HUD:
+  - **⏱️ Timer pill** — countdown with color warnings (amber < 30s, red < 10s)
+  - **🎯 Moves pill** — moves left with color warnings (amber < 10, red < 5)
+  - **🔄 Undo button** — badge showing free undos remaining (green/amber/red/lock)
+
+### [game_screen.dart](file:///c:/Users/vivek/.gemini/antigravity/scratch/aqua-sort-flutter/lib/features/game/screens/game_screen.dart)
+- Added lost-state listener to trigger game-over overlay
+- Added `_buildGameOverOverlay()` with "Time's Up!" / "No Moves Left!" messaging
+- Recovery options: Watch Ad (+30s or +5 moves), Retry, Go Home
+
+## Economy Balance (Final)
+
+| Action | Coins |
+|--------|-------|
+| Complete level (base) | **+30** |
+| Extra undo (beyond 2 free) | **-30** |
+| Watch ad | **+15** |
+| 2 ads ≈ 1 paid undo | ✅ balanced |
+
+## Verification
+
+- `flutter analyze` → **zero errors** ✅
