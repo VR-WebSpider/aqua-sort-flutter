@@ -11,6 +11,7 @@ class AuthUser {
   final String firstName;
   final String lastName;
   final String displayName;
+  final String username;
   final String? email;
   final String? phone;
   final String? avatarUrl;
@@ -36,6 +37,7 @@ class AuthUser {
     required this.firstName,
     required this.lastName,
     required this.displayName,
+    required this.username,
     this.email,
     this.phone,
     this.avatarUrl,
@@ -59,6 +61,7 @@ class AuthUser {
     String? firstName,
     String? lastName,
     String? displayName,
+    String? username,
     String? email,
     String? phone,
     String? avatarUrl,
@@ -81,6 +84,7 @@ class AuthUser {
       firstName: firstName ?? this.firstName,
       lastName: lastName ?? this.lastName,
       displayName: displayName ?? this.displayName,
+      username: username ?? this.username,
       email: email ?? this.email,
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
@@ -101,7 +105,6 @@ class AuthUser {
   }
 
   // Legacy compatibility
-  String get username => displayName;
   int get webspiderCoins => webspiderGoldCoins;
 
   factory AuthUser.guest() => const AuthUser(
@@ -109,6 +112,7 @@ class AuthUser {
     firstName: 'Guest',
     lastName: 'Sorter',
     displayName: 'Guest Sorter',
+    username: 'guest_sorter',
     coins: 0,
     webspiderBrassCoins: 100,
     webspiderCopperCoins: 200,
@@ -240,7 +244,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _supabase
           .from('profiles')
-          .select('first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
+          .select('username, first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
           .eq('id', userId)
           .maybeSingle();
 
@@ -253,6 +257,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
             await _supabase.from('profiles').update({'display_name': displayName}).eq('id', userId);
           } catch (e) {
             debugPrint('Error auto-setting display name: $e');
+          }
+        }
+
+        String username = data['username'] ?? '';
+        if (username.isEmpty) {
+          username = displayName.toLowerCase().replaceAll(RegExp(r'\s+'), '');
+          try {
+            await _supabase.from('profiles').update({'username': username}).eq('id', userId);
+          } catch (e) {
+            debugPrint('Error auto-setting username: $e');
           }
         }
 
@@ -274,6 +288,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             firstName: data['first_name'] ?? '',
             lastName: data['last_name'] ?? '',
             displayName: displayName,
+            username: username,
             email: email,
             phone: data['phone'] ?? phone,
             avatarUrl: data['avatar_url'],
@@ -297,11 +312,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } else {
         // Create initial profile if missing
         final randomNum = math.Random().nextInt(90000) + 10000;
+        final randomName = 'SpiderPlayer_$randomNum';
         await _supabase.from('profiles').insert({
           'id': userId,
           'first_name': '',
           'last_name': '',
-          'display_name': 'SpiderPlayer_$randomNum',
+          'display_name': randomName,
+          'username': randomName.toLowerCase(),
           'coins': 0,
           'owned_skins': ['default'],
           'phone': phone,
@@ -375,16 +392,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       String email = identifier;
       
-      // Dual-ID Lookup: If user entered a phone number (no @), find linked email
+      // Dual-ID Lookup: If user entered a phone number or username (no @), find linked email
       if (!identifier.contains('@')) {
         final res = await _supabase
             .from('profiles')
-            .select('email_lookup') // We assume email_lookup or similar column exists
-            .eq('phone', identifier)
+            .select('email_lookup')
+            .or('phone.eq.$identifier,username.eq.${identifier.toLowerCase().trim()}')
             .maybeSingle();
         
-        if (res == null) throw 'Phone number not recognized.';
-        email = res['email_lookup'];
+        if (res == null) throw 'Username or Phone number not recognized.';
+        email = res['email_lookup'] ?? '';
+        if (email.isEmpty) throw 'Associated email not found.';
       }
 
       await _supabase.auth.signInWithPassword(email: email, password: password);
@@ -435,6 +453,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'first_name': '',
           'last_name': '',
           'display_name': randomName,
+          'username': randomName.toLowerCase(),
           'email_lookup': email, // Save email here for phone-based lookup later
           'phone': phone,
           'coins': 0,
@@ -580,22 +599,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return true;
   }
 
-  /// Sends a "Purity Reset" email for password recovery
   Future<void> forgotPassword(String identifier) async {
     state = AuthState.loading();
     try {
       String email = identifier;
 
-      // If phone provided, find linked email
+      // If phone or username provided (no @), find linked email
       if (!identifier.contains('@')) {
         final res = await _supabase
             .from('profiles')
             .select('email_lookup')
-            .eq('phone', identifier)
+            .or('phone.eq.$identifier,username.eq.${identifier.toLowerCase().trim()}')
             .maybeSingle();
         
-        if (res == null) throw 'Phone number not linked to any account.';
-        email = res['email_lookup'];
+        if (res == null) throw 'Username or Phone number not linked to any account.';
+        email = res['email_lookup'] ?? '';
+        if (email.isEmpty) throw 'Associated email not found.';
       }
 
       String? redirectTo;
@@ -619,7 +638,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> updateProfile({String? firstName, String? lastName, String? displayName, String? avatarUrl}) async {
+  Future<void> updateProfile({
+    String? firstName,
+    String? lastName,
+    String? displayName,
+    String? avatarUrl,
+    String? username,
+    String? phone,
+    String? email,
+  }) async {
     if (state.user == null || state.user!.id == 'guest') return;
 
     final updates = {
@@ -628,6 +655,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (lastName != null) 'last_name': lastName,
       if (displayName != null) 'display_name': displayName,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (username != null) 'username': username,
+      if (phone != null) 'phone': phone,
+      if (email != null) 'email_lookup': email,
       'updated_at': DateTime.now().toIso8601String(),
     };
 
@@ -638,6 +668,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
         lastName: lastName,
         displayName: displayName,
         avatarUrl: avatarUrl,
+        username: username,
+        phone: phone,
+        email: email,
       );
       state = AuthState(status: state.status, user: newUser);
     } catch (e) {

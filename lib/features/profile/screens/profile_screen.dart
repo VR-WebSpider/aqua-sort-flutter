@@ -56,6 +56,18 @@ class ProfileScreen extends ConsumerWidget {
                           color: Colors.white,
                         ),
                       ),
+                      if (user != null)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2.0, bottom: 4.0),
+                          child: Text(
+                            '@${user.username}',
+                            style: GoogleFonts.outfit(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.tealAccent,
+                            ),
+                          ),
+                        ),
                       Text(
                         user?.email ?? 'No email linked',
                         style: GoogleFonts.outfit(

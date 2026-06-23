@@ -8,6 +8,7 @@ import 'package:aqua_sort/features/profile/widgets/profile_otp_overlay.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:aqua_sort/core/router/app_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProfileEditorOverlay extends ConsumerStatefulWidget {
   const ProfileEditorOverlay({super.key});
@@ -19,6 +20,7 @@ class ProfileEditorOverlay extends ConsumerStatefulWidget {
 class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
   late TextEditingController _firstController;
   late TextEditingController _lastController;
+  late TextEditingController _usernameController;
   late TextEditingController _displayController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
@@ -41,6 +43,7 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
     final user = ref.read(authProvider).user;
     _firstController = TextEditingController(text: user?.firstName ?? '');
     _lastController = TextEditingController(text: user?.lastName ?? '');
+    _usernameController = TextEditingController(text: user?.username ?? '');
     _displayController = TextEditingController(text: user?.displayName ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
     _phoneController = TextEditingController(text: user?.phone ?? '');
@@ -54,23 +57,162 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
   void dispose() {
     _firstController.dispose();
     _lastController.dispose();
+    _usernameController.dispose();
     _displayController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     super.dispose();
   }
 
-  void _saveBasic() {
-    ref.read(authProvider.notifier).updateProfile(
-      firstName: _firstController.text,
-      lastName: _lastController.text,
-      displayName: _displayController.text,
-      avatarUrl: _avatars[_avatarIdx],
+  Future<void> _saveProfile() async {
+    final user = ref.read(authProvider).user;
+    if (user == null) return;
+
+    final firstName = _firstController.text.trim();
+    final lastName = _lastController.text.trim();
+    final displayName = _displayController.text.trim();
+    final username = _usernameController.text.trim().toLowerCase();
+    final newEmail = _emailController.text.trim().toLowerCase();
+    
+    // Clean and normalize phone number
+    final localPhone = _phoneController.text.trim();
+    final newPhone = localPhone.isNotEmpty 
+        ? '$_countryCode $localPhone'.replaceAll(RegExp(r'[\s\-\(\)]'), '')
+        : '';
+        
+    final isUsernameChanged = username != (user.username).toLowerCase();
+    final isEmailChanged = newEmail != (user.email ?? '').toLowerCase();
+    final isPhoneChanged = newPhone != (user.phone ?? '').replaceAll(RegExp(r'[\s\-\(\)]'), '');
+
+    // Validate inputs
+    if (displayName.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Display name is required.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    if (username.isEmpty || !RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(username)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username must be 3-20 characters, containing only lowercase letters, numbers, or underscores.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    if (newEmail.isEmpty || !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(newEmail)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid email address.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    // Start loading/saving
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
-    setState(() => _isEditing = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
-    );
+
+    try {
+      final supabase = Supabase.instance.client;
+
+      // Uniqueness Checks
+      if (isUsernameChanged) {
+        final res = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
+        if (res != null && res['id'] != user.id) {
+          throw 'Username is already taken.';
+        }
+      }
+
+      if (isEmailChanged) {
+        final res = await supabase.from('profiles').select('id').eq('email_lookup', newEmail).maybeSingle();
+        if (res != null && res['id'] != user.id) {
+          throw 'Email is already registered.';
+        }
+      }
+
+      if (isPhoneChanged && newPhone.isNotEmpty) {
+        final res = await supabase.from('profiles').select('id').eq('phone', newPhone).maybeSingle();
+        if (res != null && res['id'] != user.id) {
+          throw 'Phone number is already registered.';
+        }
+      }
+
+      // Close loading dialog
+      if (mounted) Navigator.pop(context);
+
+      if (isUsernameChanged || isEmailChanged || isPhoneChanged) {
+        // Gated by OTP Verification sent to registered email
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (_) => ProfileOtpOverlay(
+              email: user.email ?? newEmail, // Trigger to current registered email
+              phone: user.phone ?? newPhone,
+              onVerified: () async {
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) => const Center(child: CircularProgressIndicator()),
+                );
+                try {
+                  // Perform DB Updates
+                  await ref.read(authProvider.notifier).updateProfile(
+                    firstName: firstName,
+                    lastName: lastName,
+                    displayName: displayName,
+                    avatarUrl: _avatars[_avatarIdx],
+                    username: username,
+                    phone: newPhone,
+                    email: newEmail,
+                  );
+                  // Update GoTrue Email / Phone
+                  if (isEmailChanged) {
+                    await ref.read(authProvider.notifier).updateEmail(newEmail);
+                  }
+                  if (isPhoneChanged) {
+                    await ref.read(authProvider.notifier).updatePhone(newPhone);
+                  }
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading indicator
+                    setState(() => _isEditing = false);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+                    );
+                  }
+                } catch (e) {
+                  if (mounted) {
+                    Navigator.pop(context); // Close loading indicator
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Failed to update: $e'), backgroundColor: Colors.redAccent),
+                    );
+                  }
+                }
+              },
+            ),
+          );
+        }
+      } else {
+        // Direct save (only display name / basic info changed)
+        await ref.read(authProvider.notifier).updateProfile(
+          firstName: firstName,
+          lastName: lastName,
+          displayName: displayName,
+          avatarUrl: _avatars[_avatarIdx],
+        );
+        setState(() => _isEditing = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
+        );
+      }
+    }
   }
 
   void _triggerVerifyFull({VoidCallback? onVerifiedOverride}) {
@@ -309,7 +451,7 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
                     outlined: !_isEditing,
                     onTap: () {
                       if (_isEditing) {
-                        _saveBasic();
+                        _saveProfile();
                       } else {
                         setState(() => _isEditing = true);
                       }
@@ -329,7 +471,9 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
               ],
             ),
             const SizedBox(height: 12),
-            AquaField(label: 'Display Name', hint: 'Display Name', controller: _displayController, enabled: _isEditing),
+            AquaField(label: '🔒 Username (used for secure login)', hint: 'username', controller: _usernameController, enabled: _isEditing),
+            const SizedBox(height: 12),
+            AquaField(label: '👋 Display Name (shown publicly)', hint: 'Display Name', controller: _displayController, enabled: _isEditing),
             
             const SizedBox(height: 32),
             _sectionTitle('CONTACT DETAILS'),
