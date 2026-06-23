@@ -303,6 +303,24 @@ Contact: webspiderstudios@gmail.com
                   }
                 },
               ),
+              const SizedBox(height: 12),
+              GlowButton(
+                label: 'Continue with Facebook',
+                icon: Icons.facebook,
+                outlined: true,
+                onTap: () async {
+                  try {
+                    await ref.read(authProvider.notifier).signInWithSocial(OAuthProvider.facebook);
+                    if (mounted) context.go('/lobby');
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Facebook Sign-In failed: ${e.toString()}'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
+                },
+              ),
             ])),
           ),
         ),
