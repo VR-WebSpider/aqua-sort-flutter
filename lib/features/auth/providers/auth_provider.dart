@@ -245,6 +245,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
           .maybeSingle();
 
       if (data != null) {
+        String displayName = data['display_name'] ?? '';
+        if (displayName.isEmpty) {
+          final randomNum = math.Random().nextInt(90000) + 10000;
+          displayName = 'SpiderPlayer_$randomNum';
+          try {
+            await _supabase.from('profiles').update({'display_name': displayName}).eq('id', userId);
+          } catch (e) {
+            debugPrint('Error auto-setting display name: $e');
+          }
+        }
+
         final ownedRaw = data['owned_skins'];
         final ownedSkins = ownedRaw != null
             ? Set<String>.from(ownedRaw as List)
@@ -262,7 +273,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             id: userId,
             firstName: data['first_name'] ?? '',
             lastName: data['last_name'] ?? '',
-            displayName: data['display_name'] ?? '${data['first_name'] ?? 'Spider'} ${data['last_name'] ?? 'Player'}',
+            displayName: displayName,
             email: email,
             phone: data['phone'] ?? phone,
             avatarUrl: data['avatar_url'],

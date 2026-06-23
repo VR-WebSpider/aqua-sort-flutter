@@ -17,7 +17,6 @@ class _LoginState extends ConsumerState<LoginScreen> {
   final _id   = TextEditingController();
   final _pass = TextEditingController();
   bool _showPass = false;
-  String _method = 'username'; // username | email | phone
 
   @override void dispose() { _id.dispose(); _pass.dispose(); super.dispose(); }
 
@@ -91,6 +90,35 @@ class _LoginState extends ConsumerState<LoginScreen> {
                   }
                 }
               }),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Colors.white10)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('or', style: GoogleFonts.outfit(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 13)),
+                  ),
+                  const Expanded(child: Divider(color: Colors.white10)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              GlowButton(
+                label: 'Continue with Google',
+                icon: Icons.g_mobiledata,
+                outlined: true,
+                onTap: () async {
+                  try {
+                    await ref.read(authProvider.notifier).signInWithSocial(OAuthProvider.google);
+                    if (mounted) context.go('/lobby');
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Google Sign-In failed: ${e.toString()}'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
+                },
+              ),
               const SizedBox(height: 12),
 
               Align(

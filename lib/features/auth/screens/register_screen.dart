@@ -7,6 +7,7 @@ import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
 import 'package:aqua_sort/features/auth/screens/legal_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' show OAuthProvider;
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -269,6 +270,35 @@ Contact: webspiderstudios@gmail.com
                           SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
                         );
                       }
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Colors.white10)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('or', style: GoogleFonts.outfit(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 13)),
+                  ),
+                  const Expanded(child: Divider(color: Colors.white10)),
+                ],
+              ),
+              const SizedBox(height: 16),
+              GlowButton(
+                label: 'Continue with Google',
+                icon: Icons.g_mobiledata,
+                outlined: true,
+                onTap: () async {
+                  try {
+                    await ref.read(authProvider.notifier).signInWithSocial(OAuthProvider.google);
+                    if (mounted) context.go('/lobby');
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Google Sign-In failed: ${e.toString()}'), backgroundColor: Colors.redAccent),
+                      );
                     }
                   }
                 },
