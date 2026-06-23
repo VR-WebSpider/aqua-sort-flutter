@@ -15,6 +15,8 @@ class AuthUser {
   final String? email;
   final String? phone;
   final String? avatarUrl;
+  final int usernameChangesCount;
+  final DateTime? displayNameUpdatedAt;
   // ── Economy ──────────────────────────────────────────────────────────
   final int coins;
   final Set<String> ownedSkins;
@@ -41,6 +43,8 @@ class AuthUser {
     this.email,
     this.phone,
     this.avatarUrl,
+    this.usernameChangesCount = 0,
+    this.displayNameUpdatedAt,
     this.coins = 0,
     this.ownedSkins = const {'default'},
     this.webspiderBrassCoins = 100,
@@ -65,6 +69,8 @@ class AuthUser {
     String? email,
     String? phone,
     String? avatarUrl,
+    int? usernameChangesCount,
+    DateTime? displayNameUpdatedAt,
     int? coins,
     Set<String>? ownedSkins,
     int? webspiderBrassCoins,
@@ -88,6 +94,8 @@ class AuthUser {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      usernameChangesCount: usernameChangesCount ?? this.usernameChangesCount,
+      displayNameUpdatedAt: displayNameUpdatedAt ?? this.displayNameUpdatedAt,
       coins: coins ?? this.coins,
       ownedSkins: ownedSkins ?? this.ownedSkins,
       webspiderBrassCoins: webspiderBrassCoins ?? this.webspiderBrassCoins,
@@ -113,6 +121,8 @@ class AuthUser {
     lastName: 'Sorter',
     displayName: 'Guest Sorter',
     username: 'guest_sorter',
+    usernameChangesCount: 0,
+    displayNameUpdatedAt: null,
     coins: 0,
     webspiderBrassCoins: 100,
     webspiderCopperCoins: 200,
@@ -244,7 +254,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _supabase
           .from('profiles')
-          .select('username, first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
+          .select('username, username_changes_count, display_name_updated_at, first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
           .eq('id', userId)
           .maybeSingle();
 
@@ -292,6 +302,10 @@ class AuthNotifier extends StateNotifier<AuthState> {
             email: email,
             phone: data['phone'] ?? phone,
             avatarUrl: data['avatar_url'],
+            usernameChangesCount: (data['username_changes_count'] as num?)?.toInt() ?? 0,
+            displayNameUpdatedAt: data['display_name_updated_at'] != null 
+                ? DateTime.parse(data['display_name_updated_at'].toString()) 
+                : null,
             coins: (data['coins'] as num?)?.toInt() ?? 0,
             webspiderBrassCoins: (data['webspider_brass_coins'] as num?)?.toInt() ?? 100,
             webspiderCopperCoins: (data['webspider_copper_coins'] as num?)?.toInt() ?? 200,
@@ -646,6 +660,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     String? username,
     String? phone,
     String? email,
+    int? usernameChangesCount,
+    DateTime? displayNameUpdatedAt,
   }) async {
     if (state.user == null || state.user!.id == 'guest') return;
 
@@ -658,6 +674,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (username != null) 'username': username,
       if (phone != null) 'phone': phone,
       if (email != null) 'email_lookup': email,
+      if (usernameChangesCount != null) 'username_changes_count': usernameChangesCount,
+      if (displayNameUpdatedAt != null) 'display_name_updated_at': displayNameUpdatedAt.toIso8601String(),
       'updated_at': DateTime.now().toIso8601String(),
     };
 
@@ -671,6 +689,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         username: username,
         phone: phone,
         email: email,
+        usernameChangesCount: usernameChangesCount,
+        displayNameUpdatedAt: displayNameUpdatedAt,
       );
       state = AuthState(status: state.status, user: newUser);
     } catch (e) {

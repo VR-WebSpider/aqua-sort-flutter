@@ -9,6 +9,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:aqua_sort/core/router/app_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:intl/intl.dart';
 
 class ProfileEditorOverlay extends ConsumerStatefulWidget {
   const ProfileEditorOverlay({super.key});
@@ -83,6 +84,26 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
     final isUsernameChanged = username != (user.username).toLowerCase();
     final isEmailChanged = newEmail != (user.email ?? '').toLowerCase();
     final isPhoneChanged = newPhone != (user.phone ?? '').replaceAll(RegExp(r'[\s\-\(\)]'), '');
+    final isDisplayNameChanged = displayName != user.displayName;
+
+    final isUsernameLocked = user.usernameChangesCount >= 1;
+    final lastUpdated = user.displayNameUpdatedAt;
+    final nextAvailableDate = lastUpdated?.add(const Duration(days: 180));
+    final isDisplayNameLocked = nextAvailableDate != null && DateTime.now().isBefore(nextAvailableDate);
+
+    if (isUsernameChanged && isUsernameLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Username is locked and cannot be changed.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
+
+    if (isDisplayNameChanged && isDisplayNameLocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Display name is locked and cannot be changed.'), backgroundColor: Colors.redAccent),
+      );
+      return;
+    }
 
     // Validate inputs
     if (displayName.isEmpty) {
@@ -165,6 +186,8 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
                     username: username,
                     phone: newPhone,
                     email: newEmail,
+                    usernameChangesCount: isUsernameChanged ? user.usernameChangesCount + 1 : null,
+                    displayNameUpdatedAt: isDisplayNameChanged ? DateTime.now() : null,
                   );
                   // Update GoTrue Email / Phone
                   if (isEmailChanged) {
@@ -199,11 +222,14 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
           lastName: lastName,
           displayName: displayName,
           avatarUrl: _avatars[_avatarIdx],
+          displayNameUpdatedAt: isDisplayNameChanged ? DateTime.now() : null,
         );
-        setState(() => _isEditing = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
-        );
+        if (mounted) {
+          setState(() => _isEditing = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -376,6 +402,12 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
 
   @override
   Widget build(BuildContext context) {
+    final user = ref.watch(authProvider).user;
+    final isUsernameLocked = user != null && user.usernameChangesCount >= 1;
+    final lastUpdated = user?.displayNameUpdatedAt;
+    final nextAvailableDate = lastUpdated?.add(const Duration(days: 180));
+    final isDisplayNameLocked = nextAvailableDate != null && DateTime.now().isBefore(nextAvailableDate);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.deepNavy,
@@ -471,9 +503,45 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
               ],
             ),
             const SizedBox(height: 12),
-            AquaField(label: '🔒 Username (used for secure login)', hint: 'username', controller: _usernameController, enabled: _isEditing),
+            AquaField(
+              label: '🔒 Username (used for secure login)',
+              hint: 'username',
+              controller: _usernameController,
+              enabled: _isEditing && !isUsernameLocked,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+              child: Text(
+                isUsernameLocked
+                    ? '🔒 Username has been updated once and is locked.'
+                    : 'ℹ️ Secure username can only be changed once.',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: isUsernameLocked ? Colors.redAccent : AppColors.tealAccent,
+                ),
+              ),
+            ),
             const SizedBox(height: 12),
-            AquaField(label: '👋 Display Name (shown publicly)', hint: 'Display Name', controller: _displayController, enabled: _isEditing),
+            AquaField(
+              label: '👋 Display Name (shown publicly)',
+              hint: 'Display Name',
+              controller: _displayController,
+              enabled: _isEditing && !isDisplayNameLocked,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
+              child: Text(
+                isDisplayNameLocked
+                    ? '⏳ Locked until ${DateFormat('MMMM dd, yyyy').format(nextAvailableDate!)} (changed once in 6 months).'
+                    : 'ℹ️ Public display name can be changed once in 6 months.',
+                style: GoogleFonts.outfit(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w500,
+                  color: isDisplayNameLocked ? Colors.redAccent : AppColors.tealAccent,
+                ),
+              ),
+            ),
             
             const SizedBox(height: 32),
             _sectionTitle('CONTACT DETAILS'),
