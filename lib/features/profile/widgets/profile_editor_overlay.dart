@@ -19,6 +19,7 @@ class ProfileEditorOverlay extends ConsumerStatefulWidget {
 class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
   late TextEditingController _firstController;
   late TextEditingController _lastController;
+  late TextEditingController _displayController;
   late TextEditingController _emailController;
   late TextEditingController _phoneController;
   String _countryCode = '+91';
@@ -26,10 +27,12 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
   bool _isEditing = false;
   int _avatarIdx = 0;
   final List<String> _avatars = [
-    'https://img.freepik.com/free-vector/hacker-operating-laptop-cartoon-icon-illustration-technology-business-icon-concept-isolated-flat-cartoon_138676-2387.jpg',
-    'https://img.freepik.com/free-vector/cyborg-woman-head_1308-46639.jpg',
-    'https://img.freepik.com/free-vector/astronaut-meditating-cartoon-illustration_138676-3243.jpg',
-    'https://img.freepik.com/free-vector/cute-robot-waving-hand-cartoon-character_138676-3144.jpg',
+    'https://img.freepik.com/free-vector/spider-mascot-logo-illustration_23-2148924087.jpg', // Spider
+    'https://img.freepik.com/free-vector/hacker-operating-laptop-cartoon-icon-illustration-technology-business-icon-concept-isolated-flat-cartoon_138676-2387.jpg', // Hacker
+    'https://img.freepik.com/free-vector/cyborg-woman-head_1308-46639.jpg', // Cyborg
+    'https://img.freepik.com/free-vector/astronaut-meditating-cartoon-illustration_138676-3243.jpg', // Astronaut
+    'https://img.freepik.com/free-vector/cute-robot-waving-hand-cartoon-character_138676-3144.jpg', // Robot
+    'https://img.freepik.com/free-vector/ninja-mascot-logo-illustration_23-2148924089.jpg', // Ninja
   ];
 
   @override
@@ -38,6 +41,7 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
     final user = ref.read(authProvider).user;
     _firstController = TextEditingController(text: user?.firstName ?? '');
     _lastController = TextEditingController(text: user?.lastName ?? '');
+    _displayController = TextEditingController(text: user?.displayName ?? '');
     _emailController = TextEditingController(text: user?.email ?? '');
     _phoneController = TextEditingController(text: user?.phone ?? '');
     
@@ -46,22 +50,27 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
     }
   }
 
+  @override
+  void dispose() {
+    _firstController.dispose();
+    _lastController.dispose();
+    _displayController.dispose();
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
   void _saveBasic() {
     ref.read(authProvider.notifier).updateProfile(
       firstName: _firstController.text,
       lastName: _lastController.text,
+      displayName: _displayController.text,
       avatarUrl: _avatars[_avatarIdx],
     );
     setState(() => _isEditing = false);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Profile updated successfully!'), backgroundColor: Colors.green),
     );
-  }
-
-  void _changeAvatar() {
-    setState(() {
-      _avatarIdx = (_avatarIdx + 1) % _avatars.length;
-    });
   }
 
   void _triggerVerifyFull({VoidCallback? onVerifiedOverride}) {
@@ -249,31 +258,51 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
             Center(
               child: Column(
                 children: [
-                  Stack(
-                    children: [
-                      Container(
-                        width: 100, height: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.cyanGlow, width: 2),
-                          boxShadow: [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.2), blurRadius: 20)],
-                        ),
-                        child: ClipOval(child: Image.network(_avatars[_avatarIdx], fit: BoxFit.cover)),
-                      ),
-                      if (_isEditing)
-                         Positioned(
-                           right: 0, bottom: 0,
-                           child: GestureDetector(
-                             onTap: _changeAvatar,
-                             child: Container(
-                               padding: const EdgeInsets.all(8),
-                               decoration: const BoxDecoration(color: AppColors.cyanGlow, shape: BoxShape.circle),
-                               child: const Icon(Icons.camera_alt, color: Colors.black87, size: 16),
-                             ),
-                           ),
-                         ).animate().scale(curve: Curves.easeOutBack),
-                    ],
+                  Container(
+                    width: 100, height: 100,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.cyanGlow, width: 2),
+                      boxShadow: [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.2), blurRadius: 20)],
+                    ),
+                    child: ClipOval(child: Image.network(_avatars[_avatarIdx], fit: BoxFit.cover)),
                   ),
+                  if (_isEditing) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'CHOOSE PROFILE PHOTO',
+                      style: GoogleFonts.outfit(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.tealAccent,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: List.generate(_avatars.length, (idx) {
+                        final isSelected = _avatarIdx == idx;
+                        return GestureDetector(
+                          onTap: () => setState(() => _avatarIdx = idx),
+                          child: Container(
+                            width: 44, height: 44,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                color: isSelected ? AppColors.cyanGlow : Colors.white10,
+                                width: isSelected ? 2.5 : 1.5,
+                              ),
+                              boxShadow: isSelected
+                                  ? [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.3), blurRadius: 8)]
+                                  : null,
+                            ),
+                            child: ClipOval(child: Image.network(_avatars[idx], fit: BoxFit.cover)),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   GlowButton(
                     label: _isEditing ? 'SAVE CHANGES' : 'EDIT MY PROFILE',
@@ -299,6 +328,8 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
                 Expanded(child: AquaField(label: 'Last Name', hint: 'Last Name', controller: _lastController, enabled: _isEditing)),
               ],
             ),
+            const SizedBox(height: 12),
+            AquaField(label: 'Display Name', hint: 'Display Name', controller: _displayController, enabled: _isEditing),
             
             const SizedBox(height: 32),
             _sectionTitle('CONTACT DETAILS'),

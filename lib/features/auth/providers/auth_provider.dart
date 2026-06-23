@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:app_links/app_links.dart';
+import 'dart:math' as math;
 
 enum AuthStatus { authenticated, guest, unauthenticated }
 
@@ -239,7 +240,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _supabase
           .from('profiles')
-          .select('first_name, last_name, avatar_url, coins, owned_skins, phone, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
+          .select('first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
           .eq('id', userId)
           .maybeSingle();
 
@@ -259,9 +260,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
           isLoading: false,
           user: AuthUser(
             id: userId,
-            firstName: data['first_name'] ?? 'Aqua',
-            lastName: data['last_name'] ?? 'Sorter',
-            displayName: '${data['first_name'] ?? 'Aqua'} ${data['last_name'] ?? 'Sorter'}',
+            firstName: data['first_name'] ?? '',
+            lastName: data['last_name'] ?? '',
+            displayName: data['display_name'] ?? '${data['first_name'] ?? 'Spider'} ${data['last_name'] ?? 'Player'}',
             email: email,
             phone: data['phone'] ?? phone,
             avatarUrl: data['avatar_url'],
@@ -284,10 +285,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
         );
       } else {
         // Create initial profile if missing
+        final randomNum = math.Random().nextInt(90000) + 10000;
         await _supabase.from('profiles').insert({
           'id': userId,
-          'first_name': 'Aqua',
-          'last_name': 'Sorter',
+          'first_name': '',
+          'last_name': '',
+          'display_name': 'SpiderPlayer_$randomNum',
           'coins': 0,
           'owned_skins': ['default'],
           'phone': phone,
@@ -412,11 +415,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       if (res.user != null) {
+        final randomNum = math.Random().nextInt(90000) + 10000;
+        final randomName = 'SpiderPlayer_$randomNum';
+        
         // Create initial profile with BOTH email (for lookup) and phone
         await _supabase.from('profiles').upsert({
           'id': res.user!.id,
-          'first_name': firstName ?? 'Aqua',
-          'last_name': lastName ?? 'Sorter',
+          'first_name': '',
+          'last_name': '',
+          'display_name': randomName,
           'email_lookup': email, // Save email here for phone-based lookup later
           'phone': phone,
           'coins': 0,
@@ -601,13 +608,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> updateProfile({String? firstName, String? lastName, String? avatarUrl}) async {
+  Future<void> updateProfile({String? firstName, String? lastName, String? displayName, String? avatarUrl}) async {
     if (state.user == null || state.user!.id == 'guest') return;
 
     final updates = {
       'id': state.user!.id,
       if (firstName != null) 'first_name': firstName,
       if (lastName != null) 'last_name': lastName,
+      if (displayName != null) 'display_name': displayName,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
       'updated_at': DateTime.now().toIso8601String(),
     };
@@ -617,10 +625,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final newUser = state.user!.copyWith(
         firstName: firstName,
         lastName: lastName,
+        displayName: displayName,
         avatarUrl: avatarUrl,
-        displayName: firstName != null || lastName != null 
-          ? '${firstName ?? state.user!.firstName} ${lastName ?? state.user!.lastName}' 
-          : null,
       );
       state = AuthState(status: state.status, user: newUser);
     } catch (e) {

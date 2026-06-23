@@ -47,9 +47,9 @@ class ProfileScreen extends ConsumerWidget {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        user != null && user.firstName != 'Guest' 
-                          ? '${user.firstName} ${user.lastName}' 
-                          : 'Guest Sorter',
+                        user != null
+                            ? (user.displayName.isNotEmpty ? user.displayName : '${user.firstName} ${user.lastName}')
+                            : 'Guest Sorter',
                         style: GoogleFonts.outfit(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
