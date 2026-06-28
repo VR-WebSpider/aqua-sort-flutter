@@ -1,0 +1,9 @@
+- [x] Create and deploy `config.toml` (verify_jwt = false) for the Edge Function
+- [x] Reorder start buttons in `splash_screen.dart`
+- [ ] Implement guest check mapping in `auth_provider.dart`
+- [ ] Toggle Log Out / Log In button in `profile_screen.dart`
+- [ ] Fix Purity Exchange overlay layout overflows in `exchange_overlay.dart`
+- [ ] Run `flutter analyze` to verify code correctness
+- [ ] Build the debug APK with `flutter build apk --debug`
+- [ ] Copy the built APK to the scratch folder `f:\.gemini\antigravity\scratch\app-debug.apk`
+- [ ] Complete walkthrough documentation

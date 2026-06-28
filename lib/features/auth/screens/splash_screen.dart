@@ -22,6 +22,7 @@ class _SplashState extends ConsumerState<SplashScreen> with TickerProviderStateM
 
   late final Animation<double> _floatAnim = CurvedAnimation(parent: _float, curve: Curves.easeInOut);
   late final Animation<double> _fadeAnim  = CurvedAnimation(parent: _fade,  curve: Curves.easeOut);
+  bool _isGuestLoading = false;
 
   @override void dispose() { _wave.dispose(); _float.dispose(); _fade.dispose(); super.dispose(); }
 
@@ -121,22 +122,27 @@ class _SplashState extends ConsumerState<SplashScreen> with TickerProviderStateM
               padding: EdgeInsets.symmetric(horizontal: size.width * 0.1),
               child: Column(children: [
                 GlowButton(
+                  label: 'Secure Login', 
+                  icon: Icons.lock_outline,
+                  onTap: () => context.go('/login'),
+                ),
+                const SizedBox(height: 14),
+                GlowButton(
                   label: 'Play as Guest', 
                   outlined: true,
-                  loading: ref.watch(authProvider).isLoading,
+                  loading: _isGuestLoading,
                   onTap: () async {
+                    setState(() => _isGuestLoading = true);
                     try {
                       await ref.read(authProvider.notifier).setGuest();
                     } catch (e) {
+                      setState(() => _isGuestLoading = false);
                       if (context.mounted) {
                         AquaErrorDialog.show(context, e);
                       }
                     }
                   },
                 ),
-                const SizedBox(height: 14),
-                GlowButton(label: 'Secure Login', icon: Icons.lock_outline,
-                    onTap: () => context.go('/login')),
               ]),
             ),
 

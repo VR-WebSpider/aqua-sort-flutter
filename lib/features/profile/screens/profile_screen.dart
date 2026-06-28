@@ -28,80 +28,91 @@ class ProfileScreen extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 AquaHeader(onBack: () => context.pop()),
-                const SizedBox(height: 32),
-                Center(
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 100, height: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.cyanGlow, width: 2),
-                          color: AppColors.inputBg,
-                        ),
-                        child: ClipOval(
-                          child: (user?.avatarUrl != null)
-                             ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
-                             : const Icon(Icons.person_outline, size: 50, color: AppColors.textSecondary),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        user != null
-                            ? (user.displayName.isNotEmpty ? user.displayName : '${user.firstName} ${user.lastName}')
-                            : 'Guest Sorter',
-                        style: GoogleFonts.outfit(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
-                      ),
-                      if (user != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 2.0, bottom: 4.0),
-                          child: Text(
-                            '@${user.username}',
-                            style: GoogleFonts.outfit(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.tealAccent,
-                            ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    physics: const BouncingScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 32),
+                        Center(
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 100, height: 100,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: AppColors.cyanGlow, width: 2),
+                                  color: AppColors.inputBg,
+                                ),
+                                child: ClipOval(
+                                  child: (user?.avatarUrl != null)
+                                     ? Image.network(user!.avatarUrl!, fit: BoxFit.cover)
+                                     : const Icon(Icons.person_outline, size: 50, color: AppColors.textSecondary),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                user != null
+                                    ? (user.displayName.isNotEmpty ? user.displayName : '${user.firstName} ${user.lastName}')
+                                    : 'Guest Sorter',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              if (user != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2.0, bottom: 4.0),
+                                  child: Text(
+                                    '@${user.username}',
+                                    style: GoogleFonts.outfit(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.tealAccent,
+                                    ),
+                                  ),
+                                ),
+                              Text(
+                                user?.email ?? 'No email linked',
+                                style: GoogleFonts.outfit(
+                                  fontSize: 14,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      Text(
-                        user?.email ?? 'No email linked',
-                        style: GoogleFonts.outfit(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
+                        const SizedBox(height: 32),
+                        _profileItem(Icons.person_outline, 'My Profile', onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => const ProfileEditorOverlay(),
+                          );
+                        }),
+                        _profileItem(Icons.history_outlined, 'Game History', onTap: () => _showHistory(context)),
+                        _profileItem(Icons.emoji_events_outlined, 'Achievements', onTap: () => _showAchievements(context)),
+                        _profileItem(Icons.auto_awesome_outlined, 'Purity Exchange', onTap: () => context.push('/customization')),
+                        _profileItem(Icons.settings_outlined, 'Settings', onTap: () => _showSettings(context)),
+                        _profileItem(Icons.policy_outlined, 'Privacy Policy', onTap: () => _showPrivacy(context)),
+                        _profileItem(Icons.delete_forever_outlined, 'Reset Progress & Data', isDestructive: true, onTap: () => _showResetConfirm(context, ref)),
+                        const SizedBox(height: 24),
+                        GlowButton(
+                          label: auth.status == AuthStatus.guest ? 'Log In / Sign Up' : 'Log Out',
+                          outlined: true,
+                          onTap: () {
+                            ref.read(authProvider.notifier).logout();
+                            context.go('/login');
+                          },
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 24),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: 48),
-                _profileItem(Icons.person_outline, 'My Profile', onTap: () {
-                  showModalBottomSheet(
-                    context: context,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => const ProfileEditorOverlay(),
-                  );
-                }),
-                _profileItem(Icons.history_outlined, 'Game History', onTap: () => _showHistory(context)),
-                _profileItem(Icons.emoji_events_outlined, 'Achievements', onTap: () => _showAchievements(context)),
-                _profileItem(Icons.settings_outlined, 'Settings', onTap: () => _showSettings(context)),
-                _profileItem(Icons.policy_outlined, 'Privacy Policy', onTap: () => _showPrivacy(context)),
-                _profileItem(Icons.delete_forever_outlined, 'Reset Progress & Data', isDestructive: true, onTap: () => _showResetConfirm(context, ref)),
-                const Spacer(),
-                GlowButton(
-                  label: 'Log Out',
-                  outlined: true,
-                  onTap: () {
-                    ref.read(authProvider.notifier).logout();
-                    context.go('/login');
-                  },
-                ),
-                const SizedBox(height: 24),
               ],
             ),
           ),
@@ -232,7 +243,7 @@ class ProfileScreen extends ConsumerWidget {
   void _showPrivacy(BuildContext context) {
     _showModal(context, 'PRIVACY POLICY', SingleChildScrollView(
       child: Text(
-        "AQUA SORT PRIVACY POLICY\n\n1. Data Collection: We only store your game progress, level unlocks, and coin count locally on your device via SharedPreferences. If you create an account, we store your username and hashed password on our secure servers.\n\n2. Usage: This data is used solely to provide game progression and leaderboard features.\n\n3. Third Parties: We do not share your personal data with any third-party services.\n\n4. Permissions: The app requires internet access for account registration and leaderboards.\n\nFor more info, contact vr.webspider@gmail.com",
+        "AQUA SORT PRIVACY POLICY\n\n1. Data Collection: We only store your game progress, level unlocks, and coin count locally on your device via SharedPreferences. If you create an account, we store your username and hashed password on our secure servers.\n\n2. Usage: This data is used solely to provide game progression and leaderboard features.\n\n3. Third Parties: We do not share your personal data with any third-party services.\n\n4. Permissions: The app requires internet access for account registration and leaderboards.\n\nFor more info, contact webspiderstudios@gmail.com",
         style: GoogleFonts.outfit(color: Colors.white70, height: 1.6),
       ),
     ));

@@ -290,8 +290,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
             ? Set<String>.from(milestoneRaw as List)
             : <String>{};
 
+        final bool isGuestUser = _supabase.auth.currentUser?.isAnonymous ?? false;
         state = state.copyWith(
-          status: AuthStatus.authenticated,
+          status: isGuestUser ? AuthStatus.guest : AuthStatus.authenticated,
           isLoading: false,
           user: AuthUser(
             id: userId,
@@ -651,6 +652,49 @@ class AuthNotifier extends StateNotifier<AuthState> {
       rethrow;
     }
   }
+
+  Future<void> verifyRecoveryOtp(String identifier, String token) async {
+    state = AuthState.loading();
+    try {
+      String email = identifier;
+
+      // Dual-ID Lookup: If user entered a phone number or username (no @), find linked email
+      if (!identifier.contains('@')) {
+        final res = await _supabase
+            .from('profiles')
+            .select('email_lookup')
+            .or('phone.eq.$identifier,username.eq.${identifier.toLowerCase().trim()}')
+            .maybeSingle();
+        
+        if (res == null) throw 'Username or Phone number not recognized.';
+        email = res['email_lookup'] ?? '';
+        if (email.isEmpty) throw 'Associated email not found.';
+      }
+
+      await _supabase.auth.verifyOTP(
+        email: email,
+        token: token,
+        type: OtpType.recovery,
+      );
+
+      // Transition to recovering password state
+      state = AuthState(
+        status: AuthStatus.authenticated,
+        user: state.user,
+        isLoading: false,
+        isRecoveringPassword: true,
+      );
+    } on AuthApiException catch (e) {
+      state = AuthState.unauthenticated();
+      if (e.code == 'otp_expired') throw 'Code expired. Please resend.';
+      if (e.code == 'invalid_otp') throw 'Invalid code. Please check and try again.';
+      rethrow;
+    } catch (e) {
+      state = AuthState.unauthenticated();
+      rethrow;
+    }
+  }
+
 
   Future<void> updateProfile({
     String? firstName,

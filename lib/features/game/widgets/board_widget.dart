@@ -10,6 +10,8 @@ import 'interactive_tutorial_overlay.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/core/services/economy_config.dart';
+import 'dart:async';
+
 
 class BoardWidget extends ConsumerStatefulWidget {
   final int playerIdx;
@@ -20,13 +22,14 @@ class BoardWidget extends ConsumerStatefulWidget {
 }
 
 class _BoardWidgetState extends ConsumerState<BoardWidget> {
+  Timer? _hintTimer;
   final List<GlobalKey> _tubeKeys = [];
 
   @override
   void initState() {
     super.initState();
     _initKeys(ref.read(gameProvider).playerStates[widget.playerIdx]!.tubes.length);
-  }
+    _resetHintTimer();  }
 
   void _initKeys(int count) {
     if (_tubeKeys.length != count) {
@@ -34,6 +37,26 @@ class _BoardWidgetState extends ConsumerState<BoardWidget> {
       _tubeKeys.addAll(List.generate(count, (_) => GlobalKey()));
     }
   }
+
+  // Resets inactivity hint timer
+  void _resetHintTimer() {
+    _hintTimer?.cancel();
+
+    // Only schedule hint if game is actively playing
+    final gameState = ref.read(gameProvider);
+    if (gameState.status != GameStatus.playing) return;
+
+    _hintTimer = Timer(const Duration(seconds: 12), () async {
+      final hint = await ref.read(gameProvider.notifier).requestHint(widget.playerIdx);
+      if (hint != null) {
+        final idx = hint.from;
+        if (idx < _tubeKeys.length) {
+          (_tubeKeys[idx].currentState as dynamic)?.shake();
+        }
+      }
+    });
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -63,8 +86,10 @@ class _BoardWidgetState extends ConsumerState<BoardWidget> {
                   _UndoButton(
                     freeUndosLeft: state.freeUndosLeft,
                     canUndo: state.canUndo,
-                    onTap: () => ref.read(gameProvider.notifier)
-                        .requestUndo(widget.playerIdx, context),
+                    onTap: () {
+                        ref.read(gameProvider.notifier).requestUndo(widget.playerIdx, context);
+                        _resetHintTimer();
+                      },
                   ),
                   if (!gameState.isSplitScreen && !gameState.isOnline) ...[
                     const SizedBox(width: 8),
@@ -109,7 +134,7 @@ class _BoardWidgetState extends ConsumerState<BoardWidget> {
                             }
                           }
                           ref.read(gameProvider.notifier).selectTube(widget.playerIdx, i);
-                        },
+                        _resetHintTimer();                        },
                       ),
                     );
                   }),
@@ -197,6 +222,11 @@ class _BoardWidgetState extends ConsumerState<BoardWidget> {
     final boardBox = context.findRenderObject() as RenderBox;
     return boardBox.globalToLocal(rb.localToGlobal(Offset.zero));
   }
+@override
+void dispose() {
+  _hintTimer?.cancel();
+  super.dispose();
+}
 }
 
 // ── HUD Widgets ─────────────────────────────────────────────────────────────

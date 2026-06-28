@@ -148,50 +148,73 @@ class _ExchangeOverlayState extends ConsumerState<ExchangeOverlay> {
 
   Widget _buildHeader(BuildContext context, int coins, bool isGuest) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.04),
         border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.08))),
       ),
       child: Row(
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('PURITY EXCHANGE',
-                  style: GoogleFonts.righteous(fontSize: 20, color: Colors.white, letterSpacing: 1.5)),
-              Text('Spend coins. Unlock power.',
-                  style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textMuted)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'PURITY EXCHANGE',
+                    style: GoogleFonts.righteous(
+                      fontSize: 18, 
+                      color: Colors.white, 
+                      letterSpacing: 1.2
+                    ),
+                  ),
+                ),
+                Text(
+                  'Spend coins. Unlock power.',
+                  style: GoogleFonts.outfit(
+                    fontSize: 11, 
+                    color: AppColors.textMuted
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           // Wallet display
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: const Color(0xFFFFD700).withOpacity(0.08),
-              borderRadius: BorderRadius.circular(24),
+              borderRadius: BorderRadius.circular(20),
               border: Border.all(color: const Color(0xFFFFD700).withOpacity(0.3)),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('🪙', style: TextStyle(fontSize: 18)),
-                const SizedBox(width: 8),
+                const Text('🪙', style: TextStyle(fontSize: 15)),
+                const SizedBox(width: 4),
                 Text(
                   '$coins',
                   style: GoogleFonts.righteous(
-                    fontSize: 20,
+                    fontSize: 16,
                     color: const Color(0xFFFFD700),
-                    letterSpacing: 1,
+                    letterSpacing: 0.5,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
+          const SizedBox(width: 4),
           IconButton(
-            icon: const Icon(Icons.close, color: Colors.white60),
+            icon: const Icon(Icons.close, color: Colors.white60, size: 20),
             onPressed: () => Navigator.pop(context),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -212,35 +235,38 @@ class _ExchangeOverlayState extends ConsumerState<ExchangeOverlay> {
       decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: Colors.white.withOpacity(0.06))),
       ),
-      child: Row(
-        children: tabs.map((t) {
-          final selected = _selectedTier == t.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTier = t.$1),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.tealAccent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: selected ? AppColors.tealAccent : Colors.white24,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: tabs.map((t) {
+            final selected = _selectedTier == t.$1;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: GestureDetector(
+                onTap: () => setState(() => _selectedTier = t.$1),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: selected ? AppColors.tealAccent : Colors.transparent,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? AppColors.tealAccent : Colors.white24,
+                    ),
                   ),
-                ),
-                child: Text(
-                  t.$2,
-                  style: GoogleFonts.outfit(
-                    fontSize: 13,
-                    color: selected ? Colors.black : Colors.white60,
-                    fontWeight: FontWeight.w600,
+                  child: Text(
+                    t.$2,
+                    style: GoogleFonts.outfit(
+                      fontSize: 13,
+                      color: selected ? Colors.black : Colors.white60,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
-            ),
-          );
-        }).toList(),
+            );
+          }).toList(),
+        ),
       ),
     );
   }
@@ -385,7 +411,7 @@ class _ExchangeOverlayState extends ConsumerState<ExchangeOverlay> {
         crossAxisCount: 2,
         mainAxisSpacing: 16,
         crossAxisSpacing: 16,
-        childAspectRatio: 0.78,
+        childAspectRatio: 0.68,
       ),
       itemCount: skins.length,
       itemBuilder: (context, i) {
@@ -492,7 +518,7 @@ class _SkinCard extends StatelessWidget {
               : null,
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -529,7 +555,7 @@ class _SkinCard extends StatelessWidget {
 
               // Skin visual preview
               Container(
-                width: 52, height: 76,
+                width: 48, height: 68,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: skin.primaryColor.withOpacity(0.5), width: 2),
@@ -541,7 +567,7 @@ class _SkinCard extends StatelessWidget {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: List.generate(3, (j) => Container(
-                    width: 28, height: 14,
+                    width: 24, height: 12,
                     margin: const EdgeInsets.symmetric(horizontal: 6),
                     decoration: BoxDecoration(
                       color: skin.primaryColor.withOpacity(0.6 + (j * 0.1)),

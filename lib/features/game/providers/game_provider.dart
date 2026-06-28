@@ -442,6 +442,20 @@ class GameNotifier extends StateNotifier<MultiGameState> {
     }
   }
 
+  /// Provides a hint move using the GameSolver.
+  /// Returns the first suggested move or null if none available.
+  Future<TutorialMove?> requestHint(int playerIdx) async {
+    // Online games only allow primary player to request hint.
+    if (state.isOnline && playerIdx != 0) return null;
+    final playerState = state.playerStates[playerIdx];
+    if (playerState == null) return null;
+    final path = GameSolver.solve(playerState.tubes);
+    if (path != null && path.isNotEmpty) {
+      return path.first;
+    }
+    return null;
+  }
+
   /// Pauses the game (timer and interactions).
   /// First 2 pauses are free. Subsequent pauses require Spider Coins, Ads, or Premium.
   Future<void> pauseGame(BuildContext context) async {

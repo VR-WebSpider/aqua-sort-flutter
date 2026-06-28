@@ -45,7 +45,9 @@ class Tube {
   int get topCount {
     final top = topColor; if (top < 0) return 0;
     int c = 0;
-    for (int i = colors.length - 1; i >= 0 && colors[i] == top; i--) c++;
+    for (int i = colors.length - 1; i >= 0 && colors[i] == top; i--) {
+      c++;
+    }
     return c;
   }
 }
@@ -156,25 +158,43 @@ class PuzzleGenerator {
       emptyTubes = 2;
     }
 
-    final totalTubes = colorCount + emptyTubes;
     final isSpecial = (level % 5 == 0);
 
-    // Fill colors × 4 each, shuffle
-    final pool = <int>[];
-    for (int c = 0; c < colorCount; c++) {
-      for (int s = 0; s < Tube.slots; s++) pool.add(c);
-    }
-    // Fisher-Yates
-    for (int i = pool.length - 1; i > 0; i--) {
-      final j = rng.nextInt(i + 1);
-      final t = pool[i]; pool[i] = pool[j]; pool[j] = t;
-    }
+    List<Tube> tubes = [];
+    bool solvable = false;
+    int attempts = 0;
 
-    final tubes = <Tube>[];
-    for (int t = 0; t < colorCount; t++) {
-      tubes.add(Tube(pool.sublist(t * 4, t * 4 + 4), isMystery: isSpecial));
+    while (!solvable && attempts < 100) {
+      attempts++;
+      final pool = <int>[];
+      for (int c = 0; c < colorCount; c++) {
+        for (int s = 0; s < Tube.slots; s++) {
+          pool.add(c);
+        }
+      }
+      // Fisher-Yates
+      for (int i = pool.length - 1; i > 0; i--) {
+        final j = rng.nextInt(i + 1);
+        final t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+      }
+
+      tubes = <Tube>[];
+      for (int t = 0; t < colorCount; t++) {
+        tubes.add(Tube(pool.sublist(t * 4, t * 4 + 4), isMystery: isSpecial));
+      }
+      for (int e = 0; e < emptyTubes; e++) {
+        tubes.add(Tube.empty());
+      }
+
+      if (level == 1) {
+        solvable = true;
+      } else {
+        final path = GameSolver.solve(tubes);
+        if (path != null) {
+          solvable = true;
+        }
+      }
     }
-    for (int e = 0; e < emptyTubes; e++) tubes.add(Tube.empty());
 
     return GameState(
       tubes: tubes,
@@ -282,4 +302,137 @@ extension DifficultyExt on Difficulty {
     const Color(0xFF26C6DA), const Color(0xFF42A5F5),
     const Color(0xFFAB47BC), const Color(0xFFEF5350),
   ][index];
+}
+
+// ── Tutorial Move ─────────────────────────────────────────────────────────────
+class TutorialMove {
+  final int from;
+  final int to;
+  TutorialMove(this.from, this.to);
+
+  @override
+  String toString() => 'TutorialMove(from: $from, to: $to)';
+}
+
+// ── Game Solver ────────────────────────────────────────────────────────────────
+class GameSolver {
+  final int maxDepth;
+  final int maxVisited;
+  final Set<String> _visited = {};
+  final List<TutorialMove> _path = [];
+  int _iterations = 0;
+
+  GameSolver({this.maxDepth = 100, this.maxVisited = 10000});
+
+  static List<TutorialMove>? solve(List<Tube> tubes) {
+    final solver = GameSolver();
+    if (solver._dfs(tubes, 0)) {
+      return solver._path;
+    }
+    return null;
+  }
+
+  bool _dfs(List<Tube> tubes, int depth) {
+    _iterations++;
+    if (_iterations > maxVisited || depth > maxDepth) {
+      return false;
+    }
+
+    if (tubes.every((t) => t.isSolved)) {
+      return true;
+    }
+
+    final key = _getVisitedKey(tubes);
+    if (_visited.contains(key)) {
+      return false;
+    }
+    _visited.add(key);
+
+    // Find and score all valid moves
+    final moves = <_ScoredMove>[];
+    for (int i = 0; i < tubes.length; i++) {
+      for (int j = 0; j < tubes.length; j++) {
+        if (i == j) continue;
+        if (GameEngine.canPour(tubes[i], tubes[j])) {
+          final score = _scoreMove(tubes, i, j);
+          if (score > -50) {
+            moves.add(_ScoredMove(i, j, score));
+          }
+        }
+      }
+    }
+
+    // Sort moves by score descending
+    moves.sort((a, b) => b.score.compareTo(a.score));
+
+    for (final move in moves) {
+      final nextTubes = _pour(tubes, move.from, move.to);
+      _path.add(TutorialMove(move.from, move.to));
+      if (_dfs(nextTubes, depth + 1)) {
+        return true;
+      }
+      _path.removeLast();
+    }
+
+    return false;
+  }
+
+  int _scoreMove(List<Tube> tubes, int fromIdx, int toIdx) {
+    final src = tubes[fromIdx];
+    final dest = tubes[toIdx];
+
+    if (dest.isEmpty) {
+      final uniqueColors = src.colors.where((c) => c >= 0).toSet();
+      if (uniqueColors.length <= 1) {
+        return -100; // useless swap
+      }
+    }
+
+    final nextTubes = _pour(tubes, fromIdx, toIdx);
+    final nextDest = nextTubes[toIdx];
+    if (nextDest.isSolved) {
+      return 100;
+    }
+
+    final nextSrc = nextTubes[fromIdx];
+    if (nextSrc.isEmpty) {
+      return 50;
+    }
+
+    if (!dest.isEmpty) {
+      return 20;
+    }
+
+    return 10;
+  }
+
+  String _getVisitedKey(List<Tube> tubes) {
+    final tubeStrings = tubes.map((t) => t.colors.join(',')).toList();
+    tubeStrings.sort();
+    return tubeStrings.join(';');
+  }
+
+  List<Tube> _pour(List<Tube> tubes, int fromIdx, int toIdx) {
+    final from = Tube.copy(tubes[fromIdx]);
+    final to = Tube.copy(tubes[toIdx]);
+
+    final color = from.topColor;
+    while (from.topColor == color && to.freeSlots > 0) {
+      final slot = to.colors.lastIndexOf(-1);
+      to.colors[slot] = color;
+      from.colors[from.colors.lastIndexOf(color)] = -1;
+    }
+
+    final newTubes = List<Tube>.from(tubes);
+    newTubes[fromIdx] = from;
+    newTubes[toIdx] = to;
+    return newTubes;
+  }
+}
+
+class _ScoredMove {
+  final int from;
+  final int to;
+  final int score;
+  _ScoredMove(this.from, this.to, this.score);
 }

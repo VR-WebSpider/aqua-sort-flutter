@@ -2,11 +2,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:aqua_sort/features/game/engine/game_engine.dart';
 import 'package:aqua_sort/features/game/widgets/liquid_painter.dart';
-import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/core/services/audio_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
+import 'package:aqua_sort/features/profile/models/skin_catalogue.dart';
 
 /// Draws a single test tube with stacked colored water layers and realistic wobble effects.
 class TubeWidget extends ConsumerStatefulWidget {
@@ -257,14 +257,9 @@ class _TubePainter extends CustomPainter {
     final w = size.width, h = size.height;
     final r = w / 2;
     final lipH = h * 0.08;
-    final bodyH = h - lipH;
-    final slotH = bodyH / Tube.slots;
 
     // ── Tube body path ─────────────────────────────────────────────
-    final tubePath = Path()
-      ..moveTo(0, lipH) ..lineTo(0, h - r)
-      ..arcToPoint(Offset(w, h - r), radius: Radius.circular(r), clockwise: false)
-      ..lineTo(w, lipH) ..close();
+    final tubePath = SkinCatalogue.getTubePath(activeSkinId, w, h, lipH, r);
 
     // ── Clip and draw liquid using LiquidPainter logic ────────────────
     canvas.save();
@@ -299,27 +294,9 @@ class _TubePainter extends CustomPainter {
     canvas.restore();
 
     // ── Glow when selected ─────────────────────────────────────────
-    Color borderColor = Colors.white.withOpacity(0.45);
-    Color glowColor = const Color(0xFF00E5FF);
-    
-    switch (activeSkinId) {
-       case 'cyber_neon': 
-          borderColor = AppColors.cyanGlow.withOpacity(0.6);
-          glowColor = AppColors.cyanGlow;
-          break;
-       case 'toxic_slime':
-          borderColor = Colors.greenAccent.withOpacity(0.6);
-          glowColor = Colors.greenAccent;
-          break;
-       case 'solar_flare':
-          borderColor = Colors.orangeAccent.withOpacity(0.6);
-          glowColor = Colors.orangeAccent;
-          break;
-       case 'void_matter':
-          borderColor = Colors.purpleAccent.withOpacity(0.6);
-          glowColor = Colors.purpleAccent;
-          break;
-    }
+    final skin = SkinCatalogue.byId(activeSkinId);
+    Color borderColor = skin.borderColor.withOpacity(0.55);
+    Color glowColor = skin.glowColor;
 
     if (selected) {
       canvas.drawPath(tubePath,
@@ -336,7 +313,8 @@ class _TubePainter extends CustomPainter {
           ..color = selected ? glowColor : borderColor);
 
     // ── Lip ────────────────────────────────────────────────────────
-    canvas.drawLine(Offset(0, lipH), Offset(w, lipH),
+    final bounds = SkinCatalogue.getTubeTopBounds(activeSkinId, w);
+    canvas.drawLine(Offset(bounds[0], lipH), Offset(bounds[1], lipH),
         Paint()..color = Colors.white.withOpacity(0.4) ..strokeWidth = 2);
 
     // ── Cap (Only if solved, full, and active) ──────────
@@ -347,16 +325,20 @@ class _TubePainter extends CustomPainter {
 
   void _drawCap(Canvas canvas, Size size, double lipH, Color liquidColor, double progress) {
     final w = size.width;
+    final bounds = SkinCatalogue.getTubeTopBounds(activeSkinId, w);
+    final x1 = bounds[0];
+    final x2 = bounds[1];
+    final capW = x2 - x1;
     final capH = lipH * 1.2;
     
     final double offsetY = -20.0 * (1.0 - progress);
     final double opacity = progress.clamp(0.0, 1.0);
     
     final capPath = Path()
-      ..moveTo(-2, lipH + 2 + offsetY)
-      ..lineTo(w + 2, lipH + 2 + offsetY)
-      ..lineTo(w + 2, lipH - capH + offsetY)
-      ..quadraticBezierTo(w/2, lipH - capH - 8 + offsetY, -2, lipH - capH + offsetY)
+      ..moveTo(x1 - 2, lipH + 2 + offsetY)
+      ..lineTo(x2 + 2, lipH + 2 + offsetY)
+      ..lineTo(x2 + 2, lipH - capH + offsetY)
+      ..quadraticBezierTo((x1 + x2)/2, lipH - capH - 8 + offsetY, x1 - 2, lipH - capH + offsetY)
       ..close();
 
     // Metallic Gradient
@@ -368,7 +350,7 @@ class _TubePainter extends CustomPainter {
           const Color(0xFF37474F).withOpacity(opacity)
         ],
         begin: Alignment.topLeft, end: Alignment.bottomRight,
-      ).createShader(Rect.fromLTWH(0, offsetY, w, lipH));
+      ).createShader(Rect.fromLTWH(x1, offsetY, capW, lipH));
 
     canvas.drawPath(capPath, paint);
     
@@ -381,7 +363,7 @@ class _TubePainter extends CustomPainter {
         ..strokeWidth = 1
     );
     canvas.drawCircle(
-      Offset(w/2, lipH - capH/2 + offsetY), 
+      Offset((x1 + x2)/2, lipH - capH/2 + offsetY), 
       3, 
       Paint()..color = liquidColor.withOpacity(opacity * 0.8)
     );
@@ -389,7 +371,17 @@ class _TubePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TubePainter old) =>
-      old.tube != tube || old.selected != selected || old.wobble != wobble;
+      old.tube != tube ||
+      old.selected != selected ||
+      old.wobble != wobble ||
+      old.tilt != tilt ||
+      old.topLayerFill != topLayerFill ||
+      old.showCap != showCap ||
+      old.colors != colors ||
+      old.activeSkinId != activeSkinId ||
+      old.idleValue != idleValue ||
+      old.isReceiving != isReceiving ||
+      old.capProgress != capProgress;
 }
 
 class _SparkleEffect extends StatefulWidget {

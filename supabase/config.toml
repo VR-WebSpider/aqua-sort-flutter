@@ -1,0 +1,30 @@
+[auth]
+site_url = "com.webspider.aquasort.mobile://login-callback/"
+additional_redirect_urls = ["com.webspider.aquasort.mobile://login-callback/"]
+enable_anonymous_sign_ins = true
+
+[auth.mfa.totp]
+enroll_enabled = true
+verify_enabled = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+template = '{{ if eq .Data.game "Aqua Sort" }}Aqua Sort: Your verification code is: {{ .Token }}. Valid for 5 minutes.{{ else if eq .Data.game "Chess Royale" }}Chess Royale: Your verification code is: {{ .Token }}. Valid for 5 minutes.{{ else }}WebSpider Studios: Your verification code is: {{ .Token }}. Valid for 5 minutes.{{ end }}'
+max_frequency = "5s"
+
+[auth.rate_limit]
+email_sent = 500
+sign_in_sign_ups = 500
+
+[functions.send-security-email]
+verify_jwt = false

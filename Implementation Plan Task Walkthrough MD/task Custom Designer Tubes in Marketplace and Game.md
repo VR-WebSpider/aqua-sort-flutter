@@ -1,0 +1,6 @@
+- [ ] Modify `skin_provider.dart` to use dynamic paths and top bounds for mini/large tube previews
+- [ ] Modify `tube_widget.dart` to apply custom paths, top bounds, and aligned caps to the active gameplay tube painter
+- [ ] Run `flutter analyze` to verify code correctness
+- [ ] Compile the updated app with `flutter build apk --debug`
+- [ ] Copy the built APK to the scratch folder `f:\.gemini\antigravity\scratch\app-debug.apk`
+- [ ] Verify the UI and complete walkthrough documentation

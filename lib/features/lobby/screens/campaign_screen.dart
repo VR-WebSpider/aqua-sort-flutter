@@ -118,72 +118,74 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
                       const SizedBox(width: 8),
                       GestureDetector(
                         onTap: () => WebSpiderVaultDialog.show(context),
-                        child: Container(
-                          height: 40,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Colors.purpleAccent, Colors.deepPurple],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(24),
-                            border: Border.all(
-                              color: Colors.purpleAccent.withOpacity(0.35),
-                              width: 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.purpleAccent.withOpacity(0.3),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              )
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.vpn_key_rounded, color: Colors.white, size: 14),
-                              const SizedBox(width: 6),
-                              Text(
-                                'VAULT',
-                                style: GoogleFonts.righteous(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  letterSpacing: 0.8,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(24),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                            child: Container(
+                              height: 40,
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.35),
+                                borderRadius: BorderRadius.circular(24),
+                                border: Border.all(
+                                  color: Colors.purpleAccent.withOpacity(0.45),
+                                  width: 1.5,
                                 ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.purpleAccent.withOpacity(0.08),
+                                    blurRadius: 10,
+                                    spreadRadius: 2,
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                width: 1,
-                                height: 16,
-                                color: Colors.white30,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.vpn_key_rounded, color: Colors.purpleAccent, size: 14),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'VAULT',
+                                    style: GoogleFonts.righteous(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    width: 1,
+                                    height: 16,
+                                    color: Colors.purpleAccent.withOpacity(0.4),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Image.asset(
+                                    'assets/webspider_coins/GoldCoin.png',
+                                    width: 16,
+                                    height: 16,
+                                    errorBuilder: (_, __, ___) => const Text('🕸🥇', style: TextStyle(fontSize: 11)),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${progress.spiderGoldCoins}',
+                                    style: GoogleFonts.righteous(color: Colors.white, fontSize: 13),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Image.asset(
+                                    'assets/webspider_coins/CopperCoin.png',
+                                    width: 16,
+                                    height: 16,
+                                    errorBuilder: (_, __, ___) => const Text('🕸🟫', style: TextStyle(fontSize: 11)),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    '${progress.spiderCopperCoins}',
+                                    style: GoogleFonts.righteous(color: Colors.white, fontSize: 13),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(width: 8),
-                              Image.asset(
-                                'assets/webspider_coins/GoldCoin.png',
-                                width: 16,
-                                height: 16,
-                                errorBuilder: (_, __, ___) => const Text('🕸🥇', style: TextStyle(fontSize: 11)),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${progress.spiderGoldCoins}',
-                                style: GoogleFonts.righteous(color: Colors.white, fontSize: 13),
-                              ),
-                              const SizedBox(width: 8),
-                              Image.asset(
-                                'assets/webspider_coins/CopperCoin.png',
-                                width: 16,
-                                height: 16,
-                                errorBuilder: (_, __, ___) => const Text('🕸🟫', style: TextStyle(fontSize: 11)),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                '${progress.spiderCopperCoins}',
-                                style: GoogleFonts.righteous(color: Colors.white, fontSize: 13),
-                              ),
-                            ],
+                            ),
                           ),
                         ),
                       ),

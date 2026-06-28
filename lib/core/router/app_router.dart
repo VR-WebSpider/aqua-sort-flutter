@@ -18,6 +18,10 @@ import 'package:aqua_sort/features/game/screens/game_screen.dart';
 import 'package:aqua_sort/features/leaderboard/screens/leaderboard_screen.dart';
 import 'package:aqua_sort/features/lobby/screens/campaign_screen.dart';
 import 'package:aqua_sort/features/lobby/screens/multiplayer_lobby_screen.dart';
+import 'package:aqua_sort/features/lobby/screens/waiting_room_screen.dart';
+import 'package:aqua_sort/features/profile/screens/purity_exchange_screen.dart';
+import 'package:aqua_sort/features/profile/screens/skin_detail_screen.dart';
+import 'package:aqua_sort/features/profile/models/skin_catalogue.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -71,7 +75,11 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(
         path: '/',
-        pageBuilder: (c, s) => const NoTransitionPage(child: SplashScreen()),
+        pageBuilder: (c, s) => NoTransitionPage(
+          key: s.pageKey,
+          name: s.matchedLocation,
+          child: const SplashScreen(),
+        ),
       ),
       GoRoute(
         path: '/login',
@@ -120,12 +128,23 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (c, s) => _zoomTransition(s, const MultiplayerLobbyScreen()),
       ),
       GoRoute(
+        path: '/waiting-room',
+        pageBuilder: (c, s) => _zoomTransition(s, const WaitingRoomScreen()),
+      ),
+      GoRoute(
         path: '/profile',
         pageBuilder: (c, s) => _slideTransition(s, const ProfileScreen(), begin: const Offset(1, 0)),
       ),
       GoRoute(
         path: '/customization',
-        pageBuilder: (c, s) => _zoomTransition(s, const CustomizationScreen()),
+        pageBuilder: (c, s) => _zoomTransition(s, const PurityExchangeScreen()),
+      ),
+      GoRoute(
+        path: '/skin-detail',
+        pageBuilder: (c, s) {
+          final skin = s.extra as TubeSkin;
+          return _slideTransition(s, SkinDetailScreen(skin: skin), begin: const Offset(0, 1));
+        },
       ),
       GoRoute(
         path: '/game',
@@ -142,6 +161,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 CustomTransitionPage _fadeTransition(GoRouterState state, Widget child) {
   return CustomTransitionPage(
     key: state.pageKey,
+    name: state.matchedLocation,
     child: child,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       return FadeTransition(opacity: animation, child: child);
@@ -152,6 +172,7 @@ CustomTransitionPage _fadeTransition(GoRouterState state, Widget child) {
 CustomTransitionPage _slideTransition(GoRouterState state, Widget child, {required Offset begin}) {
   return CustomTransitionPage(
     key: state.pageKey,
+    name: state.matchedLocation,
     child: child,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       return SlideTransition(
@@ -167,6 +188,7 @@ CustomTransitionPage _slideTransition(GoRouterState state, Widget child, {requir
 CustomTransitionPage _zoomTransition(GoRouterState state, Widget child) {
   return CustomTransitionPage(
     key: state.pageKey,
+    name: state.matchedLocation,
     child: child,
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
       return ScaleTransition(
@@ -191,10 +213,17 @@ class GoRouterRefreshStream extends ChangeNotifier {
 }
 
 class NavigationAudioObserver extends NavigatorObserver {
+  bool _isFirst = true;
+
   @override
   void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPush(route, previousRoute);
-    if (previousRoute != null) {
+    if (_isFirst) {
+      _isFirst = false;
+      return;
+    }
+    final prevName = previousRoute?.settings.name;
+    if (prevName != null && prevName != '/') {
       AudioService.instance.playClick();
     }
   }
@@ -202,7 +231,8 @@ class NavigationAudioObserver extends NavigatorObserver {
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     super.didPop(route, previousRoute);
-    if (previousRoute != null) {
+    final prevName = previousRoute?.settings.name;
+    if (prevName != null && prevName != '/') {
       AudioService.instance.playClick();
     }
   }

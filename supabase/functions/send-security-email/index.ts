@@ -6,6 +6,7 @@ serve(async (req) => {
   try {
     const body = await req.json();
     
+
     let game = "WebSpider Studios";
     let targetEmail = "";
     let subject = "";
@@ -26,7 +27,10 @@ serve(async (req) => {
       const siteUrl = body.site_url;
       
       // Construct confirmation URL
-      const confirmUrl = `${siteUrl}/auth/v1/verify?token=${tokenHash}&type=${actionType}&redirect_to=${encodeURIComponent(redirectTo)}`;
+      // Use SUPABASE_URL so the link is a clickable HTTPS URL in email clients (which block custom mobile protocol links)
+      const baseApiUrl = Deno.env.get('SUPABASE_URL') || "https://zpwwjdiwcucwfuzyuiqu.supabase.co";
+      const confirmUrl = `${baseApiUrl.replace(/\/$/, '')}/auth/v1/verify?token=${tokenHash}&type=${actionType}&redirect_to=${encodeURIComponent(redirectTo)}`;
+
       
       if (actionType === 'signup') {
         subject = `[${game}] 💧 Alchemist Purity Verification`;
@@ -66,7 +70,11 @@ serve(async (req) => {
         html = getPurityChallengeTemplate(record.code, theme);
       }
     } else {
-      return new Response(JSON.stringify({ error: "Invalid payload structure" }), { status: 400 });
+      console.warn("Unknown payload structure:", body);
+      return new Response(JSON.stringify({}), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
     // Deliver email via Resend API
@@ -84,11 +92,36 @@ serve(async (req) => {
       }),
     });
 
-    const data = await res.json();
-    return new Response(JSON.stringify(data), { status: 200 });
+    const resData = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      console.error("Resend API error:", resData);
+      return new Response(JSON.stringify({
+        error: {
+          message: resData.message || `Failed to send email via Resend (Status ${res.status})`,
+        },
+        http_code: res.status
+      }), {
+        status: res.status,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
+    return new Response(JSON.stringify({}), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    console.error("Hook runtime error:", error);
+    return new Response(JSON.stringify({
+      error: {
+        message: error.message || "Internal server error inside email hook",
+      },
+      http_code: 500
+    }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 })
 
