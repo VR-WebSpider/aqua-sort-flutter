@@ -144,9 +144,13 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             CelebrationOverlay(),
             AwesomeVictoryOverlay(
               winnerIdx: game.winnerIdx ?? 0,
-              onNext: () {
+              onNext: () async {
                 AudioService.instance.stopAll();
-                context.go('/lobby');
+                AdService.instance.recordLevelComplete();
+                await AdService.instance.showInterstitialIfReady();
+                if (mounted) {
+                  context.go('/lobby');
+                }
               },
             ),
           ],

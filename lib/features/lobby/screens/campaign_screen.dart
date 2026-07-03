@@ -19,6 +19,7 @@ import 'package:aqua_sort/features/lobby/widgets/spider_coin_pill.dart';
 import 'package:aqua_sort/features/lobby/widgets/spider_coin_store_dialog.dart';
 import 'package:aqua_sort/features/lobby/widgets/webspider_vault_dialog.dart';
 import 'package:aqua_sort/features/lobby/widgets/daily_reward_dialog.dart';
+import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
 
 class CampaignScreen extends ConsumerStatefulWidget {
   const CampaignScreen({super.key});
@@ -247,6 +248,17 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
             Positioned.fill(
               child: TutorialOverlay(onClose: () => setState(() => _showTutorialManual = false)),
             ),
+
+          // ── Banner Ad (passive, hidden for premium) ───────────────────────
+          const Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              top: false,
+              child: AdBannerWidget(),
+            ),
+          ),
         ],
       ),
     );

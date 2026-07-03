@@ -10,6 +10,7 @@ import 'package:aqua_sort/features/profile/providers/settings_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:aqua_sort/features/profile/widgets/profile_editor_overlay.dart';
+import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -113,6 +114,8 @@ class ProfileScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 12),
+                const AdBannerWidget(),
               ],
             ),
           ),

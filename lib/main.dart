@@ -5,8 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'core/theme/app_colors.dart';
 import 'core/router/app_router.dart';
 import 'features/profile/providers/settings_provider.dart';
+import 'core/services/ad_service.dart';
 
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
 
 void main() async {
   debugPrint('APP STARTING');
@@ -28,6 +30,10 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+  // Initialize AdMob SDK before the first frame
+  await AdService.instance.initialize();
+
   runApp(const ProviderScope(child: AquaSortApp()));
 }
 
@@ -38,6 +44,9 @@ class AquaSortApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     // Initialize settings to apply audio preferences immediately
     ref.watch(settingsProvider);
+    final isPremium = ref.watch(premiumProvider);
+    AdService.instance.isPremium = isPremium;
+    
     final router = ref.watch(routerProvider);
     return MaterialApp.router(
       title: 'Aqua Sort',

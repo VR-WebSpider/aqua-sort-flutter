@@ -21,4 +21,11 @@ class EconomyConfig {
 
   /// Extra moves granted when watching an ad after moves-depleted loss.
   static const int adBonusMoves = 5;
+
+  // ── Interstitial Frequency Caps ───────────────────────────────────────
+  /// Minimum number of levels completed before an interstitial may be shown.
+  static const int interstitialMinLevels = 3;
+
+  /// Minimum seconds between consecutive interstitial impressions (5 minutes).
+  static const int interstitialMinSeconds = 300;
 }

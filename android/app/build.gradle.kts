@@ -71,10 +71,19 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Enable R8/ProGuard for code shrinking & obfuscation
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
+    // The deobfuscation (mapping) file is auto-generated at:
+    //   build/outputs/mapping/release/mapping.txt
+    // Upload this to Google Play Console for each release to symbolicate
+    // crashes and ANRs.
 }
 
 flutter {

@@ -9,6 +9,7 @@ import '../providers/leaderboard_provider.dart';
 import '../models/score_entry.dart';
 
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
 
 class LeaderboardScreen extends ConsumerStatefulWidget {
   const LeaderboardScreen({super.key});
@@ -94,6 +95,8 @@ class _LeaderboardState extends ConsumerState<LeaderboardScreen> {
                   loading: () => const Expanded(child: Center(child: CircularProgressIndicator(color: AppColors.cyanGlow))),
                   error: (e, _) => Expanded(child: Center(child: Text('Sync Error: $e', style: const TextStyle(color: Colors.redAccent)))),
                 ),
+                const SizedBox(height: 12),
+                const AdBannerWidget(),
               ],
             ),
           ),
