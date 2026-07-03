@@ -77,6 +77,39 @@ serve(async (req) => {
       });
     }
 
+    // For GoTrue actions (signup, recovery, email_change, etc.), log the OTP code to purity_challenges
+    // so it is always retrievable from the database as a fallback.
+    if (body.email_action_type && body.user) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL');
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+        if (supabaseUrl && supabaseServiceKey) {
+          const expiresAt = new Date(Date.now() + 3600 * 1000).toISOString();
+          const logRes = await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/purity_challenges`, {
+            method: 'POST',
+            headers: {
+              'apikey': supabaseServiceKey,
+              'Authorization': `Bearer ${supabaseServiceKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              user_id: body.user.id || null,
+              code: body.token,
+              target_email: targetEmail,
+              challenge_type: `GOTRUE_${body.email_action_type.toUpperCase()}`,
+              game: game,
+              expires_at: expiresAt,
+            }),
+          });
+          if (!logRes.ok) {
+            console.error("Failed to log fallback OTP code:", await logRes.text());
+          }
+        }
+      } catch (err) {
+        console.error("Error logging fallback OTP code to database:", err);
+      }
+    }
+
     // Deliver email via Resend API
     const res = await fetch('https://api.resend.com/emails', {
       method: 'POST',
