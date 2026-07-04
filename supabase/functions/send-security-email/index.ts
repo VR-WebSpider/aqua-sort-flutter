@@ -4,27 +4,58 @@ const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 
 serve(async (req) => {
   try {
-    const body = await req.json();
+    const body = await req.json().catch(() => ({}));
     
+    // Debug: Log incoming request details to database
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      if (supabaseUrl && supabaseServiceKey) {
+        await fetch(`${supabaseUrl.replace(/\/$/, '')}/rest/v1/webspider_logs`, {
+          method: 'POST',
+          headers: {
+            'apikey': supabaseServiceKey,
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            session_id: "send-security-email-debug",
+            action: JSON.stringify({
+              email_action_type: body.email_action_type || null,
+              has_token: !!body.token,
+              token_length: body.token ? body.token.length : 0,
+              has_user: !!body.user,
+              full_body: body
+            }),
+            agent_name: "send-security-email"
+          }),
+        });
+      }
+    } catch (err) {
+      console.error("Error logging request body to webspider_logs:", err);
+    }
 
     let game = "WebSpider Studios";
     let targetEmail = "";
     let subject = "";
     let html = "";
     
+    const emailData = body.email_data || body;
+    const isGoTrueHook = !!(emailData.email_action_type && body.user);
+
     // Check if request is from Supabase GoTrue Auth Hook or custom database trigger
-    if (body.email_action_type && body.user) {
+    if (isGoTrueHook) {
       // --- CASE 1: GoTrue Send Email Hook ---
       const user = body.user;
       targetEmail = user.email;
       game = user.user_metadata?.game || "WebSpider Studios";
       const theme = getThemeColors(game);
       
-      const actionType = body.email_action_type;
-      const token = body.token;
-      const tokenHash = body.token_hash;
-      const redirectTo = body.redirect_to;
-      const siteUrl = body.site_url;
+      const actionType = emailData.email_action_type;
+      const token = emailData.token;
+      const tokenHash = emailData.token_hash;
+      const redirectTo = emailData.redirect_to;
+      const siteUrl = emailData.site_url;
       
       // Construct confirmation URL
       // Use SUPABASE_URL so the link is a clickable HTTPS URL in email clients (which block custom mobile protocol links)
@@ -79,7 +110,7 @@ serve(async (req) => {
 
     // For GoTrue actions (signup, recovery, email_change, etc.), log the OTP code to purity_challenges
     // so it is always retrievable from the database as a fallback.
-    if (body.email_action_type && body.user) {
+    if (isGoTrueHook) {
       try {
         const supabaseUrl = Deno.env.get('SUPABASE_URL');
         const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -93,10 +124,10 @@ serve(async (req) => {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              user_id: body.user.id || null,
-              code: body.token,
+              user_id: null,
+              code: emailData.token,
               target_email: targetEmail,
-              challenge_type: `GOTRUE_${body.email_action_type.toUpperCase()}`,
+              challenge_type: `GOTRUE_${emailData.email_action_type.toUpperCase()}`,
               game: game,
               expires_at: expiresAt,
             }),
