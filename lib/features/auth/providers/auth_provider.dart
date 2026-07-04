@@ -254,7 +254,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final data = await _supabase
           .from('profiles')
-          .select('username, username_changes_count, display_name_updated_at, first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
+          .select('username, username_changes_count, display_name_updated_at, first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, email_lookup, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
           .eq('id', userId)
           .maybeSingle();
 
@@ -280,6 +280,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
           }
         }
 
+        // Auto-heal missing email_lookup if email is known
+        String emailLookup = data['email_lookup'] ?? '';
+        if (emailLookup.isEmpty && email != null && email.isNotEmpty) {
+          emailLookup = email;
+          try {
+            await _supabase.from('profiles').update({'email_lookup': email}).eq('id', userId);
+          } catch (e) {
+            debugPrint('Error auto-setting email_lookup: $e');
+          }
+        }
+
         final ownedRaw = data['owned_skins'];
         final ownedSkins = ownedRaw != null
             ? Set<String>.from(ownedRaw as List)
@@ -300,7 +311,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
             lastName: data['last_name'] ?? '',
             displayName: displayName,
             username: username,
-            email: email,
+            email: email ?? (emailLookup.isNotEmpty ? emailLookup : null),
             phone: data['phone'] ?? phone,
             avatarUrl: data['avatar_url'],
             usernameChangesCount: (data['username_changes_count'] as num?)?.toInt() ?? 0,
@@ -337,6 +348,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'coins': 0,
           'owned_skins': ['default'],
           'phone': phone,
+          'email_lookup': email,
         });
         _fetchProfile(userId, email, phone);
       }
@@ -407,13 +419,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       String email = identifier;
       
-      // Dual-ID Lookup: If user entered a phone number or username (no @), find linked email
+      // Multi-ID Lookup: If user entered a username or phone number (no @), resolve the email
       if (!identifier.contains('@')) {
-        final res = await _supabase
-            .from('profiles')
-            .select('email_lookup')
-            .or('phone.eq.$identifier,username.eq.${identifier.toLowerCase().trim()}')
-            .maybeSingle();
+        final cleanId = identifier.trim();
+        // Check if identifier looks like a phone number (digits, optional leading +, spaces, dashes)
+        final isPhone = RegExp(r'^\+?[0-9\s\-\(\)]+$').hasMatch(cleanId);
+        
+        dynamic res;
+        if (isPhone) {
+          final rawDigits = cleanId.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+          if (rawDigits.length >= 7) {
+            res = await _supabase
+                .from('profiles')
+                .select('email_lookup')
+                .or('phone.eq.$cleanId,phone.like.*$rawDigits')
+                .maybeSingle();
+          } else {
+            res = await _supabase
+                .from('profiles')
+                .select('email_lookup')
+                .eq('phone', cleanId)
+                .maybeSingle();
+          }
+        } else {
+          res = await _supabase
+              .from('profiles')
+              .select('email_lookup')
+              .eq('username', cleanId.toLowerCase())
+              .maybeSingle();
+        }
         
         if (res == null) throw 'Username or Phone number not recognized.';
         email = res['email_lookup'] ?? '';

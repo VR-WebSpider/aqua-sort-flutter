@@ -6,6 +6,7 @@ import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:country_code_picker/country_code_picker.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -15,10 +16,47 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginState extends ConsumerState<LoginScreen> {
   final _form = GlobalKey<FormState>();
   final _id   = TextEditingController();
+  final _phoneId = TextEditingController();
   final _pass = TextEditingController();
   bool _showPass = false;
+  bool _usePhone = false;
+  String _countryCode = '+91';
 
-  @override void dispose() { _id.dispose(); _pass.dispose(); super.dispose(); }
+  @override void dispose() {
+    _id.dispose();
+    _phoneId.dispose();
+    _pass.dispose();
+    super.dispose();
+  }
+
+  Widget _loginTab(String label, bool active, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: active ? AppColors.inputBg : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: active ? AppColors.cyanGlow.withOpacity(0.3) : Colors.white10),
+            boxShadow: active
+                ? [BoxShadow(color: AppColors.cyanGlow.withOpacity(0.1), blurRadius: 8)]
+                : null,
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: GoogleFonts.outfit(
+              color: active ? Colors.white : Colors.white38,
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 1.0,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,16 +89,62 @@ class _LoginState extends ConsumerState<LoginScreen> {
               Text('Welcome back, Sorter', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary)),
               const SizedBox(height: 24),
 
-              const SizedBox(height: 24),
-              
-              AquaField(
-                label: 'User ID / Email',
-                hint: 'Enter username/email /phone',
-                controller: _id,
-                keyboardType: TextInputType.text,
-                lockIcon: true,
-                validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+              // Tab Selector
+              Row(
+                children: [
+                  _loginTab('Email / Username', !_usePhone, () => setState(() => _usePhone = false)),
+                  const SizedBox(width: 12),
+                  _loginTab('Phone Number', _usePhone, () => setState(() => _usePhone = true)),
+                ],
               ),
+              const SizedBox(height: 20),
+              
+              if (!_usePhone)
+                AquaField(
+                  label: 'User ID / Email',
+                  hint: 'Enter username or email',
+                  controller: _id,
+                  keyboardType: TextInputType.text,
+                  lockIcon: true,
+                  validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                )
+              else
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Container(
+                      height: 46,
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.inputBg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.inputBorder),
+                      ),
+                      child: CountryCodePicker(
+                        onChanged: (c) => setState(() => _countryCode = c.dialCode!),
+                        initialSelection: 'IN',
+                        favorite: const ['+91', 'IN'],
+                        textStyle: GoogleFonts.outfit(color: Colors.white, fontSize: 13),
+                        showCountryOnly: false,
+                        showOnlyCountryWhenClosed: false,
+                        alignLeft: false,
+                        padding: EdgeInsets.zero,
+                        showDropDownButton: true,
+                        dialogBackgroundColor: AppColors.deepNavy,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: AquaField(
+                        label: 'Phone Number',
+                        hint: 'Enter mobile number',
+                        controller: _phoneId,
+                        keyboardType: TextInputType.phone,
+                        validator: (v) => v == null || v.isEmpty ? 'Required' : null,
+                      ),
+                    ),
+                  ],
+                ),
 
               AquaField(label: 'Password', hint: 'Enter password',
                   controller: _pass, obscure: !_showPass, lockIcon: true,
@@ -71,7 +155,7 @@ class _LoginState extends ConsumerState<LoginScreen> {
                   ),
                   validator: (v) => v == null || v.length < 6 ? 'Min 6 chars' : null),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
               GlowButton(
                 label: 'Sign In & Play', 
                 icon: Icons.arrow_forward_rounded, 
@@ -79,7 +163,10 @@ class _LoginState extends ConsumerState<LoginScreen> {
                 onTap: () async {
                 if (_form.currentState!.validate()) {
                   try {
-                    await ref.read(authProvider.notifier).login(_id.text, _pass.text);
+                    final String identifier = _usePhone 
+                        ? '$_countryCode ${_phoneId.text.trim()}'.replaceAll(RegExp(r'[\s\-\(\)]'), '')
+                        : _id.text.trim();
+                    await ref.read(authProvider.notifier).login(identifier, _pass.text);
                     if (mounted) context.go('/lobby');
                   } catch (e) {
                     if (mounted) {
