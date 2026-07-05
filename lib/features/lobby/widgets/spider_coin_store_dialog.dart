@@ -5,6 +5,8 @@ import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
 import 'package:aqua_sort/core/services/ad_service.dart';
 import 'package:aqua_sort/features/profile/widgets/premium_purchase_dialog.dart';
+import 'package:aqua_sort/core/providers/iap_provider.dart';
+import 'package:aqua_sort/core/widgets/iap_status_hud.dart';
 
 class SpiderCoinStoreDialog extends ConsumerStatefulWidget {
   const SpiderCoinStoreDialog({super.key});
@@ -42,6 +44,7 @@ class _SpiderCoinStoreDialogState extends ConsumerState<SpiderCoinStoreDialog> {
               color: Colors.transparent,
             ),
           ),
+          const IapStatusHud(),
           Center(
             child: Container(
               width: MediaQuery.of(context).size.width * 0.88,
@@ -146,6 +149,11 @@ class _SpiderCoinStoreDialogState extends ConsumerState<SpiderCoinStoreDialog> {
                       onPressed: _loading ? null : _goPremium,
                     ),
                   ),
+                  const SizedBox(height: 12),
+
+                  // Real IAP Coin Packs
+                  ..._buildIapPacks(ref),
+
                   const SizedBox(height: 24),
 
                   // Close button
@@ -166,6 +174,39 @@ class _SpiderCoinStoreDialogState extends ConsumerState<SpiderCoinStoreDialog> {
         ],
       ),
     );
+  }
+
+  List<Widget> _buildIapPacks(WidgetRef ref) {
+    final iapState = ref.watch(iapServiceProvider);
+    if (iapState.isQuerying) {
+      return [const CircularProgressIndicator()];
+    }
+
+    final coinProducts = iapState.products
+        .where((p) => p.id.contains('coins'))
+        .toList()
+      ..sort((a, b) => a.rawPrice.compareTo(b.rawPrice));
+
+    if (coinProducts.isEmpty) {
+      return [const Text('No coin packs available right now.', style: TextStyle(color: Colors.white54))];
+    }
+
+    return coinProducts.map((product) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: _storeOption(
+          title: product.title.replaceAll('(Aqua Sort)', '').trim(),
+          subtitle: product.description,
+          trailing: _actionBtn(
+            label: product.price,
+            onPressed: _loading ? null : () {
+              ref.read(iapServiceProvider.notifier).buyProduct(product);
+            },
+            isPremium: false,
+          ),
+        ),
+      );
+    }).toList();
   }
 
   Widget _balanceCard(String label, int val, Color accent) {

@@ -24,6 +24,9 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
   bool _showPass = false;
   bool _showConfirmPass = false;
   bool _agreed   = false;
+  bool _allowPhoneLogin = false;
+  bool _allowUsernameLogin = false;
+  bool _isSubmitting = false;
 
   final String _privacyText = """
 PRIVACY POLICY
@@ -172,6 +175,24 @@ Contact: webspiderstudios@gmail.com
                     ),
                   ]),
                 ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: Checkbox(
+                        value: _allowPhoneLogin,
+                        onChanged: (v) => setState(() => _allowPhoneLogin = v ?? false),
+                        activeColor: AppColors.cyanGlow,
+                        checkColor: AppColors.deepNavy,
+                        side: const BorderSide(color: AppColors.tealMid),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text('Allow login with Phone Number', style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
                 const SizedBox(height: 16),
               ]),
 
@@ -183,6 +204,26 @@ Contact: webspiderstudios@gmail.com
                     onPressed: () => setState(() => _showPass = !_showPass),
                   ),
                   validator: (v) => v == null || v.length < 6 ? 'Min 6 chars' : null),
+              
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: Checkbox(
+                      value: _allowUsernameLogin,
+                      onChanged: (v) => setState(() => _allowUsernameLogin = v ?? false),
+                      activeColor: AppColors.cyanGlow,
+                      checkColor: AppColors.deepNavy,
+                      side: const BorderSide(color: AppColors.tealMid),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('Allow login with Username', style: GoogleFonts.outfit(fontSize: 12, color: AppColors.textSecondary)),
+                ],
+              ),
+              const SizedBox(height: 16),
 
               AquaField(label: 'Confirm Password', hint: 'Re-enter your password',
                   controller: _confirmPass, obscure: !_showConfirmPass, lockIcon: true,
@@ -242,8 +283,9 @@ Contact: webspiderstudios@gmail.com
 
               GlowButton(
                 label: 'Create Account', 
-                loading: ref.watch(authProvider).isLoading,
+                loading: ref.watch(authProvider).isLoading || _isSubmitting,
                 onTap: () async {
+                  if (_isSubmitting) return;
                   if (!_agreed) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Please agree to the terms first'), backgroundColor: Colors.orangeAccent),
@@ -251,12 +293,15 @@ Contact: webspiderstudios@gmail.com
                     return;
                   }
                   if (_form.currentState!.validate()) {
+                    setState(() => _isSubmitting = true);
                     try {
                       final fullPhone = _phone.text.isEmpty ? null : '$_countryCode${_phone.text}';
                       await ref.read(authProvider.notifier).signUp(
                         _email.text, 
                         _pass.text,
                         phone: fullPhone,
+                        allowPhoneLogin: _allowPhoneLogin,
+                        allowUsernameLogin: _allowUsernameLogin,
                       );
                       if (mounted) {
                         context.go('/otp', extra: {
@@ -270,6 +315,8 @@ Contact: webspiderstudios@gmail.com
                           SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
                         );
                       }
+                    } finally {
+                      if (mounted) setState(() => _isSubmitting = false);
                     }
                   }
                 },

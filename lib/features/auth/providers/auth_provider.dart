@@ -454,20 +454,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
         if (email.isEmpty) throw 'Associated email not found.';
       }
 
-      await _supabase.auth.signInWithPassword(email: email, password: password);
+      final authRes = await _supabase.auth.signInWithPassword(email: email, password: password);
+      
+      if (!identifier.contains('@')) {
+        final userMeta = authRes.user?.userMetadata;
+        final isPhone = RegExp(r'^\+?[0-9\s\-\(\)]+$').hasMatch(identifier.trim());
+        if (isPhone && (userMeta == null || userMeta['allowPhoneLogin'] != true)) {
+          await _supabase.auth.signOut();
+          throw 'Login via Phone Number is disabled. Please login with Email.';
+        } else if (!isPhone && (userMeta == null || userMeta['allowUsernameLogin'] != true)) {
+          await _supabase.auth.signOut();
+          throw 'Login via Username is disabled. Please login with Email.';
+        }
+      }
     } catch (e) {
       state = AuthState.unauthenticated();
       rethrow;
     }
   }
 
-  Future<void> signUp(String email, String password, {String? firstName, String? lastName, String? phone}) async {
+  Future<void> signUp(String email, String password, {String? firstName, String? lastName, String? phone, bool allowPhoneLogin = false, bool allowUsernameLogin = false}) async {
     state = AuthState.loading();
     try {
+      final sanitizedPhone = phone?.replaceAll(RegExp(r'[^\+0-9]'), '');
       await _supabase.auth.signUp(
         email: email, 
         password: password,
-        data: {'game': 'Aqua Sort'},
+        data: {
+          'game': 'Aqua Sort',
+          if (sanitizedPhone != null && sanitizedPhone.isNotEmpty) 'phone': sanitizedPhone,
+          'allowPhoneLogin': allowPhoneLogin,
+          'allowUsernameLogin': allowUsernameLogin,
+        },
       );
       // Reset loading state if successful, allowing OTP screen to show buttons correctly
       state = AuthState.unauthenticated(); 
@@ -495,7 +513,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (res.user != null) {
         final randomNum = math.Random().nextInt(90000) + 10000;
         final randomName = 'SpiderPlayer_$randomNum';
+        final sanitizedPhone = phone?.replaceAll(RegExp(r'[^\+0-9]'), '');
         
+        try {
+          await _supabase.auth.updateUser(UserAttributes(
+            data: {'username': randomName.toLowerCase()}
+          ));
+        } catch (_) {}
+
         // Create initial profile with BOTH email (for lookup) and phone
         await _supabase.from('profiles').upsert({
           'id': res.user!.id,
@@ -504,7 +529,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           'display_name': randomName,
           'username': randomName.toLowerCase(),
           'email_lookup': email, // Save email here for phone-based lookup later
-          'phone': phone,
+          'phone': sanitizedPhone,
           'coins': 0,
           'owned_skins': ['default'],
         });
@@ -669,13 +694,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
       String? redirectTo;
       if (kIsWeb) {
         redirectTo = '${Uri.base.origin}/?type=recovery';
-      } else if (defaultTargetPlatform == TargetPlatform.windows || defaultTargetPlatform == TargetPlatform.macOS || defaultTargetPlatform == TargetPlatform.linux) {
-        // For PC players, we use the custom protocol to redirect back to the app
-        // Note: The scheme must be registered in Supabase Dashboard > Authentication > URL Configuration
-        redirectTo = 'com.webspider.aquasort.mobile://login-callback/'; 
       } else {
-        // For Mobile players, use the native deep link to open the app directly
-        redirectTo = 'com.webspider.aquasort.mobile://login-callback/';
+        // ALWAYS use the Player Portal for Password Reset so users have a dual-mode option
+        redirectTo = 'https://vr-webspidergithubio.vercel.app/auth/?type=recovery';
       }
 
       await _supabase.auth.resetPasswordForEmail(email, redirectTo: redirectTo);

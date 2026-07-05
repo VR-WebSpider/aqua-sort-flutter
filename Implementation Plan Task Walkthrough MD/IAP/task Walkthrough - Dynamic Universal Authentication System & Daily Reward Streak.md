@@ -1,0 +1,17 @@
+- `[x]` 1. **Setup & Dependencies**
+  - `[x]` Add `in_app_purchase` and `url_launcher` to `pubspec.yaml`.
+  - `[x]` Run `flutter pub get`.
+- `[x]` 2. **Core IAP Service (`IapService`)**
+  - `[x]` Create `lib/core/services/iap_service.dart`.
+  - `[x]` Implement initialization and product querying.
+  - `[x]` Implement purchase stream listening.
+  - `[x]` Implement server-side verification logic (placeholder/interface for now, until Supabase Edge Functions are ready).
+- `[x]` 3. **State Management (`IapProvider` / update `WalletProvider`)**
+  - `[x]` Create or update providers to manage IAP state (products available, purchase in progress, errors).
+- `[x]` 4. **UI Components**
+  - `[x]` Create `IapStatusHud` for clear user messaging during checkout.
+  - `[x]` Update `PremiumPurchaseDialog` to use real IAP products.
+  - `[x]` Update `SpiderCoinStoreDialog` to use real IAP products.
+- `[x]` 5. **Supabase Edge Functions (Server-Side Verification)**
+  - `[x]` Set up Edge Function for Google Play purchase validation.
+  - `[x]` Connect Flutter `IapService` to the Edge Function.

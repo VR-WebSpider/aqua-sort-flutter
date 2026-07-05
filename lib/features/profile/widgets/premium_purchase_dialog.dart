@@ -5,6 +5,8 @@ import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:aqua_sort/core/services/audio_service.dart';
+import 'package:aqua_sort/core/providers/iap_provider.dart';
+import 'package:aqua_sort/core/widgets/iap_status_hud.dart';
 
 class PremiumPurchaseDialog extends ConsumerWidget {
   const PremiumPurchaseDialog({super.key});
@@ -48,8 +50,10 @@ class PremiumPurchaseDialog extends ConsumerWidget {
           ),
         ],
       ),
-      child: Material(
-        color: Colors.transparent,
+      child: Stack(
+        children: [
+          Material(
+            color: Colors.transparent,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -94,18 +98,8 @@ class PremiumPurchaseDialog extends ConsumerWidget {
             
             const SizedBox(height: 28),
             
-            // Upgrade button
-            GlowButton(
-              label: 'Upgrade for \$2.99',
-              icon: Icons.flash_on_rounded,
-              onTap: () async {
-                await ref.read(premiumProvider.notifier).setPremium(true);
-                await AudioService.instance.playLidClosing();
-                if (context.mounted) {
-                  Navigator.of(context).pop(true);
-                }
-              },
-            ),
+            // Real IAP Subscription Options
+            _buildIapSubscriptions(ref),
             const SizedBox(height: 12),
             
             // Cancel link
@@ -122,6 +116,41 @@ class PremiumPurchaseDialog extends ConsumerWidget {
           ],
         ),
       ),
+      const IapStatusHud(),
+      ],
+      ),
+    );
+  }
+
+  Widget _buildIapSubscriptions(WidgetRef ref) {
+    final iapState = ref.watch(iapServiceProvider);
+    
+    if (iapState.isQuerying) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    final premiumProducts = iapState.products
+        .where((p) => p.id.contains('premium'))
+        .toList()
+      ..sort((a, b) => a.rawPrice.compareTo(b.rawPrice));
+
+    if (premiumProducts.isEmpty) {
+      return const Text('Subscriptions unavailable.', style: TextStyle(color: Colors.white54));
+    }
+
+    return Column(
+      children: premiumProducts.map((product) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: GlowButton(
+            label: '${product.title.replaceAll('(Aqua Sort)', '').trim()} - ${product.price}',
+            icon: Icons.workspace_premium,
+            onTap: () {
+              ref.read(iapServiceProvider.notifier).buyProduct(product);
+            },
+          ),
+        );
+      }).toList(),
     );
   }
 

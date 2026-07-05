@@ -19,10 +19,10 @@ class _OtpState extends ConsumerState<OtpScreen> {
   final _ctrl = TextEditingController();
   String _otp = '';
   
-  // Timer logic
   Timer? _timer;
   int _secondsRemaining = 60;
   bool _canResend = false;
+  bool _isVerifying = false;
 
   @override 
   void initState() { 
@@ -114,22 +114,35 @@ class _OtpState extends ConsumerState<OtpScreen> {
                         label: _canResend ? 'Resend Code' : 'Resend (${_secondsRemaining}s)', 
                         outlined: true,
                         loading: !_canResend && _secondsRemaining == 0,
-                        onTap: _canResend ? () {
+                        onTap: _canResend ? () async {
+                          setState(() => _canResend = false);
                           _startTimer();
-                          ref.read(authProvider.notifier).signUp(
-                            widget.userData['email'],
-                            'no_password_needed_for_resend', 
-                          );
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Code resent successfully!'), backgroundColor: AppColors.midTeal),
-                          );
+                          try {
+                            await ref.read(authProvider.notifier).signUp(
+                              widget.userData['email'],
+                              'no_password_needed_for_resend', 
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Code resent successfully!'), backgroundColor: AppColors.midTeal),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
+                              );
+                            }
+                          }
                         } : () {})),
                     const SizedBox(width: 12),
                     Expanded(child: GlowButton(
                       label: 'Verify',
-                      loading: ref.watch(authProvider).isLoading,
+                      loading: ref.watch(authProvider).isLoading || _isVerifying,
                       onTap: () async {
+                        if (_isVerifying) return;
                         if (_otp.length == 6) {
+                          setState(() => _isVerifying = true);
                           final router = GoRouter.of(context);
                           final messenger = ScaffoldMessenger.of(context);
                           try {
@@ -145,6 +158,8 @@ class _OtpState extends ConsumerState<OtpScreen> {
                             messenger.showSnackBar(
                               SnackBar(content: Text(e.toString()), backgroundColor: Colors.redAccent),
                             );
+                          } finally {
+                            if (mounted) setState(() => _isVerifying = false);
                           }
                         }
                       },
