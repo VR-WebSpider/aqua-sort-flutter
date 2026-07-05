@@ -61,7 +61,8 @@ class _AdBannerWidgetState extends ConsumerState<AdBannerWidget> {
   @override
   Widget build(BuildContext context) {
     final isPremium = ref.watch(premiumProvider);
-    if (isPremium || !_adLoaded || _bannerAd == null) {
+    final isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isPremium || !_adLoaded || _bannerAd == null || isLandscape) {
       return const SizedBox.shrink();
     }
 

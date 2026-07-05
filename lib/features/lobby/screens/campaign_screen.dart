@@ -20,6 +20,7 @@ import 'package:aqua_sort/features/lobby/widgets/spider_coin_store_dialog.dart';
 import 'package:aqua_sort/features/lobby/widgets/webspider_vault_dialog.dart';
 import 'package:aqua_sort/features/lobby/widgets/daily_reward_dialog.dart';
 import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
+import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
 
 class CampaignScreen extends ConsumerStatefulWidget {
   const CampaignScreen({super.key});
@@ -205,7 +206,10 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
               child: BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
                 child: Container(
-                  padding: const EdgeInsets.only(top: 20, bottom: 40),
+                  padding: EdgeInsets.only(
+                    top: 20,
+                    bottom: ref.watch(premiumProvider) ? 40 : 12,
+                  ),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [Colors.black.withOpacity(0.4), Colors.black.withOpacity(0.0)],
@@ -238,6 +242,13 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
                           _profileBtn(ref, () => context.push('/profile')),
                         ],
                       ),
+                      if (!ref.watch(premiumProvider)) ...[
+                        const SizedBox(height: 12),
+                        const SafeArea(
+                          top: false,
+                          child: AdBannerWidget(),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -248,17 +259,6 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
             Positioned.fill(
               child: TutorialOverlay(onClose: () => setState(() => _showTutorialManual = false)),
             ),
-
-          // ── Banner Ad (passive, hidden for premium) ───────────────────────
-          const Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              top: false,
-              child: AdBannerWidget(),
-            ),
-          ),
         ],
       ),
     );

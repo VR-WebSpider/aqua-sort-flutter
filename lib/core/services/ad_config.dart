@@ -18,7 +18,7 @@ class AdConfig {
   // ── Toggle ──────────────────────────────────────────────────────────────
   /// Force test IDs even in release builds (for internal testing).
   /// Set to false when you're ready to monetise with real ads.
-  static const bool _forceTestIds = true;
+  static const bool _forceTestIds = false;
 
   static bool get _useTestIds => kDebugMode || _forceTestIds;
 

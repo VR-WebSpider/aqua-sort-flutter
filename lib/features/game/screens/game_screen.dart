@@ -19,6 +19,7 @@ import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
 import 'package:aqua_sort/features/profile/widgets/premium_purchase_dialog.dart';
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
 import 'package:aqua_sort/features/game/widgets/game_tutorial_dialogs.dart';
+import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
@@ -126,6 +127,10 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                     child: game.isSplitScreen
                         ? _buildSplitLayout(game)
                         : BoardWidget(playerIdx: 0),
+                  ),
+                  const SafeArea(
+                    top: false,
+                    child: AdBannerWidget(),
                   ),
                 ],
               ),
