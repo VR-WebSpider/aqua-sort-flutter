@@ -7,6 +7,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
+import 'package:aqua_sort/core/widgets/coin_fly_animation.dart';
 
 class DailyRewardDialog extends ConsumerStatefulWidget {
   const DailyRewardDialog({super.key});
@@ -238,6 +239,12 @@ class _DailyRewardDialogState extends ConsumerState<DailyRewardDialog> {
                     onTap: () {
                       Navigator.pop(context); // Close success dialog
                       _calculateRemainingTime();
+                      CoinFlyAnimation.play(
+                        context,
+                        from: MediaQuery.of(context).size.center(Offset.zero),
+                        isWebSpiderCoin: true,
+                        coinAssetPath: asset,
+                      );
                     },
                   ),
                 ],
@@ -327,6 +334,22 @@ class _DailyRewardDialogState extends ConsumerState<DailyRewardDialog> {
                     label: 'INTO THE VAULT',
                     onTap: () {
                       Navigator.pop(context); // Close success dialog
+                      int delay = 0;
+                      for (final rw in rewards) {
+                        final type = rw['type'] as String;
+                        final assetPath = 'assets/webspider_coins/${type[0].toUpperCase()}${type.substring(1)}Coin.png';
+                        Future.delayed(Duration(milliseconds: delay), () {
+                          if (context.mounted) {
+                            CoinFlyAnimation.play(
+                              context,
+                              from: MediaQuery.of(context).size.center(Offset.zero),
+                              isWebSpiderCoin: true,
+                              coinAssetPath: assetPath,
+                            );
+                          }
+                        });
+                        delay += 250;
+                      }
                     },
                   ),
                 ],

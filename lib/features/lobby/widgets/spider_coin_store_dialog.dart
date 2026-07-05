@@ -7,6 +7,7 @@ import 'package:aqua_sort/core/services/ad_service.dart';
 import 'package:aqua_sort/features/profile/widgets/premium_purchase_dialog.dart';
 import 'package:aqua_sort/core/providers/iap_provider.dart';
 import 'package:aqua_sort/core/widgets/iap_status_hud.dart';
+import 'package:aqua_sort/core/widgets/coin_fly_animation.dart';
 
 class SpiderCoinStoreDialog extends ConsumerStatefulWidget {
   const SpiderCoinStoreDialog({super.key});
@@ -310,6 +311,14 @@ class _SpiderCoinStoreDialogState extends ConsumerState<SpiderCoinStoreDialog> {
       setState(() {
         _successMsg = 'Successfully awarded +10 Spider Coins! 🕸';
       });
+      if (mounted) {
+        CoinFlyAnimation.play(
+          context,
+          from: MediaQuery.of(context).size.center(Offset.zero),
+          isWebSpiderCoin: true,
+          coinAssetPath: 'assets/webspider_coins/GoldCoin.png',
+        );
+      }
     } else {
       setState(() {
         _errorMsg = 'Failed to watch ad. Please try again.';
@@ -331,6 +340,14 @@ class _SpiderCoinStoreDialogState extends ConsumerState<SpiderCoinStoreDialog> {
       setState(() {
         _successMsg = 'Exchanged 50 🪙 for 10 Spider Coins! 🕸';
       });
+      if (mounted) {
+        CoinFlyAnimation.play(
+          context,
+          from: MediaQuery.of(context).size.center(Offset.zero),
+          isWebSpiderCoin: true,
+          coinAssetPath: 'assets/webspider_coins/GoldCoin.png',
+        );
+      }
     } else {
       setState(() {
         _errorMsg = 'Exchange failed. Please try again.';

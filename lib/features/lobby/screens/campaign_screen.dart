@@ -21,6 +21,7 @@ import 'package:aqua_sort/features/lobby/widgets/webspider_vault_dialog.dart';
 import 'package:aqua_sort/features/lobby/widgets/daily_reward_dialog.dart';
 import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
 import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
+import 'package:aqua_sort/core/widgets/coin_fly_animation.dart';
 
 class CampaignScreen extends ConsumerStatefulWidget {
   const CampaignScreen({super.key});
@@ -98,7 +99,10 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
           // ── Header UI ──────────────────────────────────────────────────────
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 22.0, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.of(context).size.width < 380 ? 10.0 : 22.0,
+                vertical: 12,
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -107,6 +111,7 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       CurrencyPill(
+                        key: CoinFlyAnimation.normalCoinKey,
                         coins: progress.coins,
                         onTapPlus: () {
                           showGeneralDialog(
@@ -119,14 +124,16 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
                       ),
                       const SizedBox(width: 8),
                       GestureDetector(
+                        key: CoinFlyAnimation.webspiderCoinKey,
                         onTap: () => WebSpiderVaultDialog.show(context),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                             child: Container(
+                              width: 110,
                               height: 40,
-                              padding: const EdgeInsets.symmetric(horizontal: 14),
+                              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
                               decoration: BoxDecoration(
                                 color: Colors.black.withOpacity(0.35),
                                 borderRadius: BorderRadius.circular(24),
@@ -143,47 +150,40 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
                                 ],
                               ),
                               child: Row(
-                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Icon(Icons.vpn_key_rounded, color: Colors.purpleAccent, size: 14),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'VAULT',
-                                    style: GoogleFonts.righteous(
-                                      color: Colors.white,
-                                      fontSize: 11,
-                                      letterSpacing: 0.8,
-                                    ),
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const SizedBox(width: 8),
+                                      Image.asset(
+                                        'assets/webspider_coins/GoldCoin.png',
+                                        width: 16,
+                                        height: 16,
+                                        errorBuilder: (_, __, ___) => const Text('🕸🥇', style: TextStyle(fontSize: 11)),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        '${progress.spiderGoldCoins}',
+                                        style: GoogleFonts.righteous(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  const SizedBox(width: 8),
                                   Container(
-                                    width: 1,
-                                    height: 16,
-                                    color: Colors.purpleAccent.withOpacity(0.4),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Image.asset(
-                                    'assets/webspider_coins/GoldCoin.png',
-                                    width: 16,
-                                    height: 16,
-                                    errorBuilder: (_, __, ___) => const Text('🕸🥇', style: TextStyle(fontSize: 11)),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${progress.spiderGoldCoins}',
-                                    style: GoogleFonts.righteous(color: Colors.white, fontSize: 13),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Image.asset(
-                                    'assets/webspider_coins/CopperCoin.png',
-                                    width: 16,
-                                    height: 16,
-                                    errorBuilder: (_, __, ___) => const Text('🕸🟫', style: TextStyle(fontSize: 11)),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    '${progress.spiderCopperCoins}',
-                                    style: GoogleFonts.righteous(color: Colors.white, fontSize: 13),
+                                    width: 32,
+                                    height: 32,
+                                    decoration: const BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: Colors.purpleAccent,
+                                    ),
+                                    child: const Icon(
+                                      Icons.vpn_key_rounded,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                                   ),
                                 ],
                               ),

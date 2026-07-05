@@ -20,6 +20,7 @@ import 'package:aqua_sort/features/profile/widgets/premium_purchase_dialog.dart'
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
 import 'package:aqua_sort/features/game/widgets/game_tutorial_dialogs.dart';
 import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
+import 'package:aqua_sort/features/game/widgets/live_leaderboard_overlay.dart';
 
 class GameScreen extends ConsumerStatefulWidget {
   const GameScreen({super.key});
@@ -32,6 +33,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   bool _showCelebration = false;
   bool _showLost = false;
   bool _specialLevelTutorialChecked = false;
+  bool _showLiveLeaderboard = false;
   @override
   void initState() {
     super.initState();
@@ -149,7 +151,18 @@ class _GameScreenState extends ConsumerState<GameScreen> {
             CelebrationOverlay(),
             AwesomeVictoryOverlay(
               winnerIdx: game.winnerIdx ?? 0,
-              onNext: () async {
+              onNext: () {
+                setState(() {
+                  _showCelebration = false;
+                  _showLiveLeaderboard = true;
+                });
+              },
+            ),
+          ],
+          
+          if (_showLiveLeaderboard)
+            LiveLeaderboardOverlay(
+              onContinue: () async {
                 AudioService.instance.stopAll();
                 AdService.instance.recordLevelComplete();
                 await AdService.instance.showInterstitialIfReady();
@@ -158,7 +171,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 }
               },
             ),
-          ],
           
           // ── Game Over Overlay ─────────────────────────────────────────────
           if (_showLost)

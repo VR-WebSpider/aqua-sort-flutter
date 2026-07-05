@@ -19,6 +19,8 @@ class CurrencyPill extends StatelessWidget {
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Container(
+            width: 110,
+            height: 40,
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
             decoration: BoxDecoration(
               color: Colors.black.withOpacity(0.35),
@@ -33,31 +35,33 @@ class CurrencyPill extends StatelessWidget {
               ],
             ),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const SizedBox(width: 12),
-                // Currency Icon (Text based for now as per image)
-                const Text('🪙', style: TextStyle(fontSize: 16)),
-                const SizedBox(width: 8),
-                
-                // Animated Coin Counter
-                TweenAnimationBuilder<int>(
-                  tween: IntTween(begin: coins, end: coins),
-                  duration: const Duration(milliseconds: 1000),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, value, child) {
-                    return Text(
-                      value.toString(),
-                      style: GoogleFonts.righteous(
-                        color: Colors.white,
-                        fontSize: 18,
-                        letterSpacing: 1.0,
-                      ),
-                    );
-                  },
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const SizedBox(width: 8),
+                    const Text('🪙', style: TextStyle(fontSize: 15)),
+                    const SizedBox(width: 6),
+                    
+                    // Animated Coin Counter
+                    TweenAnimationBuilder<int>(
+                      tween: IntTween(begin: coins, end: coins),
+                      duration: const Duration(milliseconds: 1000),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return Text(
+                          value.toString(),
+                          style: GoogleFonts.righteous(
+                            color: Colors.white,
+                            fontSize: 14,
+                            letterSpacing: 0.5,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                
-                const SizedBox(width: 12),
                 
                 // Action Button (+)
                 Container(

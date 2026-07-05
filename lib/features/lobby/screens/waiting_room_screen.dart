@@ -73,7 +73,7 @@ class _WaitingRoomScreenState extends ConsumerState<WaitingRoomScreen> {
     // Handle room cancellation or error
     if (room == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.go('/multiplayer');
+        context.go('/online-lobby');
       });
       return const Scaffold(
         backgroundColor: AppColors.deepNavy,
@@ -97,7 +97,7 @@ class _WaitingRoomScreenState extends ConsumerState<WaitingRoomScreen> {
                 AquaHeader(
                   onBack: () async {
                     await ref.read(multiplayerProvider.notifier).stopMatchmaking();
-                    if (mounted) context.go('/multiplayer');
+                    if (mounted) context.go('/online-lobby');
                   },
                 ),
                 const Spacer(flex: 1),
@@ -285,7 +285,7 @@ class _WaitingRoomScreenState extends ConsumerState<WaitingRoomScreen> {
                     gradientColors: const [Color(0xFF5A1A24), Colors.redAccent],
                     onTap: () async {
                       await ref.read(multiplayerProvider.notifier).stopMatchmaking();
-                      if (mounted) context.go('/multiplayer');
+                      if (mounted) context.go('/online-lobby');
                     },
                   ),
                 ),

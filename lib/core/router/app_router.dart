@@ -19,6 +19,7 @@ import 'package:aqua_sort/features/leaderboard/screens/leaderboard_screen.dart';
 import 'package:aqua_sort/features/lobby/screens/campaign_screen.dart';
 import 'package:aqua_sort/features/lobby/screens/multiplayer_lobby_screen.dart';
 import 'package:aqua_sort/features/lobby/screens/waiting_room_screen.dart';
+import 'package:aqua_sort/features/lobby/screens/combat_hub_screen.dart';
 import 'package:aqua_sort/features/profile/screens/purity_exchange_screen.dart';
 import 'package:aqua_sort/features/profile/screens/skin_detail_screen.dart';
 import 'package:aqua_sort/features/profile/models/skin_catalogue.dart';
@@ -125,6 +126,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/multiplayer',
+        pageBuilder: (c, s) => _zoomTransition(s, const CombatHubScreen()),
+      ),
+      GoRoute(
+        path: '/online-lobby',
         pageBuilder: (c, s) => _zoomTransition(s, const MultiplayerLobbyScreen()),
       ),
       GoRoute(

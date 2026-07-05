@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
+import 'package:aqua_sort/core/widgets/coin_fly_animation.dart';
 
 class CoinMeta {
   final String key;
@@ -196,6 +197,12 @@ class _WebSpiderVaultDialogState extends ConsumerState<WebSpiderVaultDialog> {
           _statusMessage = 'Successfully exchanged $fromAmount for $toAmount ${_swapTo.toUpperCase()}!';
           _statusSuccess = true;
           _amountController.clear();
+          CoinFlyAnimation.play(
+            context,
+            from: MediaQuery.of(context).size.center(Offset.zero),
+            isWebSpiderCoin: true,
+            coinAssetPath: 'assets/webspider_coins/${_swapTo[0].toUpperCase()}${_swapTo.substring(1)}Coin.png',
+          );
         } else {
           _statusMessage = 'Exchange failed. Insufficient funds or database error.';
           _statusSuccess = false;
