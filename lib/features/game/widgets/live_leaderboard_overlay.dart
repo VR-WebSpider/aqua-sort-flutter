@@ -58,7 +58,9 @@ class _LiveLeaderboardOverlayState extends ConsumerState<LiveLeaderboardOverlay>
           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Container(
             width: 340,
-            maxHeight: MediaQuery.of(context).size.height * 0.8,
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.8,
+            ),
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: AppColors.deepNavy.withOpacity(0.9),
@@ -215,7 +217,7 @@ class _LiveLeaderboardOverlayState extends ConsumerState<LiveLeaderboardOverlay>
               style: GoogleFonts.outfit(
                 fontSize: 14,
                 fontWeight: isMe ? FontWeight.bold : FontWeight.normal,
-                color: isMe ? Colors.white : Colors.whitee70,
+                color: isMe ? Colors.white : Colors.white70,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -245,8 +247,4 @@ class _LiveLeaderboardOverlayState extends ConsumerState<LiveLeaderboardOverlay>
       ),
     );
   }
-}
-
-extension on Colors {
-  static const Color whitee70 = Colors.white70;
 }
