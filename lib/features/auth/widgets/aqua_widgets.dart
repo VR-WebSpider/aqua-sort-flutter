@@ -15,10 +15,11 @@ class GlowButton extends StatefulWidget {
   final bool loading;
   final Color? glowColor;
   final List<Color>? gradientColors;
+  final double? height;
 
   const GlowButton({super.key, required this.label, required this.onTap,
       this.outlined = false, this.icon, this.loading = false,
-      this.glowColor, this.gradientColors});
+      this.glowColor, this.gradientColors, this.height});
 
   @override
   State<GlowButton> createState() => _GlowButtonState();
@@ -33,6 +34,9 @@ class _GlowButtonState extends State<GlowButton> with SingleTickerProviderStateM
 
   @override
   Widget build(BuildContext context) {
+    final double buttonHeight = widget.height ?? 52.0;
+    final isCompact = buttonHeight < 45.0;
+
     return GestureDetector(
       onTapDown: (_) => widget.loading ? null : _ctrl.forward(),
       onTapUp:   (_) { 
@@ -47,9 +51,9 @@ class _GlowButtonState extends State<GlowButton> with SingleTickerProviderStateM
         child: Opacity(
           opacity: widget.loading ? 0.8 : 1.0,
           child: Container(
-            width: double.infinity, height: 52,
+            width: double.infinity, height: buttonHeight,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
+              borderRadius: BorderRadius.circular(buttonHeight / 2),
               gradient: widget.outlined
                   ? null
                   : LinearGradient(colors: widget.gradientColors ?? const [Color(0xFF006E7F), AppColors.tealAccent]),
@@ -68,12 +72,12 @@ class _GlowButtonState extends State<GlowButton> with SingleTickerProviderStateM
                   child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2)))
               : Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                 if (widget.icon != null) ...[
-                  Icon(widget.icon, color: Colors.white, size: 18),
-                  const SizedBox(width: 8),
+                  Icon(widget.icon, color: Colors.white, size: isCompact ? 15 : 18),
+                  SizedBox(width: isCompact ? 4 : 8),
                 ],
                 Text(widget.label,
                   style: GoogleFonts.outfit(
-                      fontSize: 16, fontWeight: FontWeight.w600,
+                      fontSize: isCompact ? 13 : 16, fontWeight: FontWeight.w600,
                       color: Colors.white, letterSpacing: 0.6)),
               ]),
           ),

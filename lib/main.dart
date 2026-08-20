@@ -7,8 +7,10 @@ import 'core/router/app_router.dart';
 import 'features/profile/providers/settings_provider.dart';
 import 'core/services/ad_service.dart';
 
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
+import 'package:aqua_sort/core/services/remote_config_service.dart';
+import 'package:aqua_sort/core/services/push_notification_service.dart';
 
 void main() async {
   debugPrint('APP STARTING');
@@ -16,12 +18,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
-    await Supabase.initialize(
-      url: 'https://zpwwjdiwcucwfuzyuiqu.supabase.co',
-      anonKey: 'sb_publishable_RshKP0PKYrNinhh8xcKuqA_3CjMiKhq',
-    );
+    await Firebase.initializeApp();
+    debugPrint('Firebase initialized successfully!');
+    // Initialize remote config and updates
+    await RemoteConfigService.init();
+    // Initialize push notifications
+    await PushNotificationService.init();
   } catch (e) {
-    debugPrint('Supabase init skipped: $e');
+    debugPrint('Firebase/RemoteConfig init skipped: $e');
   }
 
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);

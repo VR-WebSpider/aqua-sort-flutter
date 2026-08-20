@@ -28,10 +28,9 @@ class AdConfig {
   static const String _testRewarded     = 'ca-app-pub-3940256099942544/5224354917';
 
   // ── Your Real Ad Unit IDs (Android) ─────────────────────────────────────
-  // TODO: Replace these with your real AdMob ad unit IDs once account is reactivated
-  static const String _realAndroidBanner       = 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX';
-  static const String _realAndroidInterstitial = 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX';
-  static const String _realAndroidRewarded     = 'ca-app-pub-XXXXXXXXXXXXXXXX/XXXXXXXXXX';
+  static const String _realAndroidBanner       = 'ca-app-pub-7398530641320878/1813092347';
+  static const String _realAndroidInterstitial = 'ca-app-pub-7398530641320878/7694341500';
+  static const String _realAndroidRewarded     = 'ca-app-pub-7398530641320878/3742241367';
 
   // ── Public Accessors ─────────────────────────────────────────────────────
   static String get bannerUnitId       => _useTestIds ? _testBanner       : _realAndroidBanner;

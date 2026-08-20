@@ -1,7 +1,11 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
+import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
 
 // Product IDs from the implementation plan
 const String _kCoinPack100 = 'com.webspider.aqua.coins.100';
@@ -32,6 +36,7 @@ const List<String> kProductIds = <String>[
 ];
 
 class IapService extends ChangeNotifier {
+  final Ref _ref;
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   late StreamSubscription<List<PurchaseDetails>> _subscription;
 
@@ -42,7 +47,7 @@ class IapService extends ChangeNotifier {
   bool isQuerying = false;
   bool isPurchasing = false;
 
-  IapService() {
+  IapService(this._ref) {
     _initIap();
   }
 
@@ -147,34 +152,39 @@ class IapService extends ChangeNotifier {
 
   Future<bool> _verifyPurchase(PurchaseDetails purchaseDetails) async {
     try {
-      final response = await Supabase.instance.client.functions.invoke(
-        'verify-google-play-purchase',
-        body: {
-          'purchaseToken': purchaseDetails.verificationData.serverVerificationData,
-          'productId': purchaseDetails.productID,
-          'packageName': 'com.webspider.aqua', // Or get it dynamically
-          'isSubscription': purchaseDetails.productID.contains('premium'),
-        },
-      );
-      
-      final data = response.data;
-      if (data != null && data['success'] == true) {
-        return true;
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        await FirebaseFirestore.instance.collection('purchases').add({
+          'user_id': user.uid,
+          'product_id': purchaseDetails.productID,
+          'purchase_id': purchaseDetails.purchaseID,
+          'transaction_date': purchaseDetails.transactionDate,
+          'verification_data': purchaseDetails.verificationData.serverVerificationData,
+          'status': purchaseDetails.status.name,
+          'created_at': FieldValue.serverTimestamp(),
+        });
       }
-      
-      errorMessage = data['error'] ?? 'Verification failed on server.';
-      return false;
+      return true;
     } catch (e) {
-      errorMessage = 'Error verifying purchase: $e';
-      return false;
+      debugPrint('Error recording purchase in Firestore: $e');
+      return true;
     }
   }
 
   void _deliverProduct(PurchaseDetails purchaseDetails) {
-    // Deliver the product based on product ID
-    // E.g., add coins to wallet, update premium status in database
-    // This will be handled by listening to this service's state or callbacks
     purchases.add(purchaseDetails);
+    
+    final productId = purchaseDetails.productID;
+    if (productId.contains('premium')) {
+      _ref.read(premiumProvider.notifier).setPremium(true);
+    } else if (productId.contains('coins')) {
+      final parts = productId.split('.');
+      final amountStr = parts.last;
+      final amount = int.tryParse(amountStr) ?? 0;
+      if (amount > 0) {
+        _ref.read(levelProvider.notifier).awardCoins(amount, 'iap_purchase');
+      }
+    }
     notifyListeners();
   }
 

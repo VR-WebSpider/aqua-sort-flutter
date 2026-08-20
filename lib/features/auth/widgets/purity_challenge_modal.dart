@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../providers/auth_provider.dart';
 
 class PurityChallengeDialog extends ConsumerStatefulWidget {
@@ -30,31 +30,44 @@ class _PurityChallengeState extends ConsumerState<PurityChallengeDialog> {
   Widget build(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
-        width: 320,
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: AppColors.darkBlue,
+          color: AppColors.bgDark,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.tealAccent.withOpacity(0.3)),
+          border: Border.all(color: AppColors.cyanGlow.withOpacity(0.4), width: 1.5),
           boxShadow: [
-            BoxShadow(color: AppColors.cyanGlow.withOpacity(0.1), blurRadius: 30, spreadRadius: 5)
+            BoxShadow(
+              color: AppColors.cyanGlow.withOpacity(0.15),
+              blurRadius: 20,
+              spreadRadius: 2,
+            ),
           ],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Icon(Icons.security_outlined, color: AppColors.cyanGlow, size: 40),
-            const SizedBox(height: 16),
-            Text('Purity Challenge', style: GoogleFonts.righteous(
-              fontSize: 22, color: Colors.white,
-            )),
-            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.security, color: AppColors.cyanGlow, size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'Security Verification',
+                  style: GoogleFonts.outfit(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
             Text(
-              _step == 1 
-                ? 'Identity verification required to modify your official profile.' 
-                : 'Enter the Purity Key sent to your registered email.',
-              textAlign: TextAlign.center,
+              _step == 1
+                  ? 'To update your sensitive account credentials, please re-enter your current password.'
+                  : 'Enter the verification code sent to your registered email.',
               style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 24),
@@ -79,14 +92,11 @@ class _PurityChallengeState extends ConsumerState<PurityChallengeDialog> {
                     final email = ref.read(authProvider).user?.email;
                     if (email == null) throw 'User email not found.';
                     
-                    // Supabase native re-auth check
-                    await Supabase.instance.client.auth.signInWithPassword(
+                    // Firebase Auth re-auth check
+                    await FirebaseAuth.instance.signInWithEmailAndPassword(
                       email: email, 
                       password: _passController.text
                     );
-                    
-                    // Trigger OTP
-                    await ref.read(authProvider.notifier).initiatePurityChallenge();
                     
                     setState(() {
                       _step = 2;

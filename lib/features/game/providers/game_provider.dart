@@ -223,9 +223,11 @@ class GameNotifier extends StateNotifier<MultiGameState> {
       if (playerState.tubes[tubeIdx].isEmpty) return;
       _updatePlayerState(playerIdx, GameState(
         tubes: playerState.tubes, moves: playerState.moves, seconds: playerState.seconds,
+        undosUsed: playerState.undosUsed,
         won: playerState.won, selectedTube: tubeIdx, history: playerState.history));
     } else if (sel == tubeIdx) {
       _updatePlayerState(playerIdx, GameState(tubes: playerState.tubes, moves: playerState.moves,
+          undosUsed: playerState.undosUsed,
           seconds: playerState.seconds, won: playerState.won, history: playerState.history));
     } else {
       if (GameEngine.canPour(playerState.tubes[sel], playerState.tubes[tubeIdx])) {
@@ -239,6 +241,7 @@ class GameNotifier extends StateNotifier<MultiGameState> {
         Future.delayed(Duration(milliseconds: duration + 200), () => finalizePour(playerIdx));
       } else {
         _updatePlayerState(playerIdx, GameState(tubes: playerState.tubes, moves: playerState.moves,
+            undosUsed: playerState.undosUsed,
             seconds: playerState.seconds, won: playerState.won, history: playerState.history));
       }
     }

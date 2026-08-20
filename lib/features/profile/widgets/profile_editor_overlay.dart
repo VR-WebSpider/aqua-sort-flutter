@@ -8,7 +8,7 @@ import 'package:aqua_sort/features/profile/widgets/profile_otp_overlay.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 import 'package:aqua_sort/core/router/app_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 
 class ProfileEditorOverlay extends ConsumerStatefulWidget {
@@ -135,26 +135,26 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
     );
 
     try {
-      final supabase = Supabase.instance.client;
+      final firestore = FirebaseFirestore.instance;
 
       // Uniqueness Checks
       if (isUsernameChanged) {
-        final res = await supabase.from('profiles').select('id').eq('username', username).maybeSingle();
-        if (res != null && res['id'] != user.id) {
+        final query = await firestore.collection('users').where('username', isEqualTo: username.toLowerCase().trim()).get();
+        if (query.docs.isNotEmpty && query.docs.first.id != user.id) {
           throw 'Username is already taken.';
         }
       }
 
       if (isEmailChanged) {
-        final res = await supabase.from('profiles').select('id').eq('email_lookup', newEmail).maybeSingle();
-        if (res != null && res['id'] != user.id) {
+        final query = await firestore.collection('users').where('email', isEqualTo: newEmail.trim()).get();
+        if (query.docs.isNotEmpty && query.docs.first.id != user.id) {
           throw 'Email is already registered.';
         }
       }
 
       if (isPhoneChanged && newPhone.isNotEmpty) {
-        final res = await supabase.from('profiles').select('id').eq('phone', newPhone).maybeSingle();
-        if (res != null && res['id'] != user.id) {
+        final query = await firestore.collection('users').where('phone', isEqualTo: newPhone.trim()).get();
+        if (query.docs.isNotEmpty && query.docs.first.id != user.id) {
           throw 'Phone number is already registered.';
         }
       }
@@ -533,7 +533,7 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
               padding: const EdgeInsets.only(top: 4.0, bottom: 8.0),
               child: Text(
                 isDisplayNameLocked
-                    ? '⏳ Locked until ${DateFormat('MMMM dd, yyyy').format(nextAvailableDate!)} (changed once in 6 months).'
+                    ? '⏳ Locked until ${DateFormat('MMMM dd, yyyy').format(nextAvailableDate)} (changed once in 6 months).'
                     : 'ℹ️ Public display name can be changed once in 6 months.',
                 style: GoogleFonts.outfit(
                   fontSize: 11,
@@ -597,14 +597,16 @@ class _ProfileEditorOverlayState extends ConsumerState<ProfileEditorOverlay> {
                  ),
                ).animate().fadeIn().moveY(begin: 10, end: 0),
             
-            const SizedBox(height: 32),
-            _sectionTitle('SECURITY'),
-            GlowButton(
-              label: 'CHANGE PASSWORD',
-              outlined: true,
-              icon: Icons.lock_outline,
-              onTap: _showChangePasswordDialog,
-            ),
+            if (_isEditing) ...[
+               const SizedBox(height: 32),
+               _sectionTitle('SECURITY'),
+               GlowButton(
+                 label: 'CHANGE PASSWORD',
+                 outlined: true,
+                 icon: Icons.lock_outline,
+                 onTap: _showChangePasswordDialog,
+               ),
+             ],
 
             const SizedBox(height: 60),
             Container(

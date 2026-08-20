@@ -22,6 +22,8 @@ import 'package:aqua_sort/features/lobby/widgets/daily_reward_dialog.dart';
 import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
 import 'package:aqua_sort/features/profile/providers/premium_provider.dart';
 import 'package:aqua_sort/core/widgets/coin_fly_animation.dart';
+import 'package:aqua_sort/features/lobby/providers/announcement_provider.dart';
+import 'package:aqua_sort/features/lobby/widgets/announcement_dialog.dart';
 
 class CampaignScreen extends ConsumerStatefulWidget {
   const CampaignScreen({super.key});
@@ -34,6 +36,7 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
   bool _showTutorialManual = false;
   bool _tutorialChecked = false;
   bool _dailyRewardChecked = false;
+  bool _announcementsChecked = false;
 
   @override
   void initState() {
@@ -79,6 +82,20 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
     }
   }
 
+  void _checkAnnouncements(AsyncValue<List<Announcement>> announcementsState) {
+    if (_announcementsChecked) return;
+    announcementsState.whenData((announcements) {
+      if (announcements.isNotEmpty) {
+        _announcementsChecked = true;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            AnnouncementDialog.show(context, announcements.first);
+          }
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final progress = ref.watch(levelProvider);
@@ -86,6 +103,9 @@ class _CampaignScreenState extends ConsumerState<CampaignScreen> {
     // Safe to check now — levelProvider has emitted its loaded state.
     _checkTutorial(progress.isLoaded, progress.tutorialSeen);
     _checkDailyReward(progress.isLoaded, progress.lastDailyClaimAt);
+
+    final announcementsState = ref.watch(announcementProvider);
+    _checkAnnouncements(announcementsState);
 
     return Scaffold(
       body: Stack(

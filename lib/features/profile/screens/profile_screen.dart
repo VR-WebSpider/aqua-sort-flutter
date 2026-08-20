@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:aqua_sort/features/profile/widgets/profile_editor_overlay.dart';
 import 'package:aqua_sort/core/widgets/ad_banner_widget.dart';
+import 'package:aqua_sort/features/lobby/providers/coupon_provider.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -98,6 +99,7 @@ class ProfileScreen extends ConsumerWidget {
                         _profileItem(Icons.emoji_events_outlined, 'Achievements', onTap: () => _showAchievements(context)),
                         _profileItem(Icons.auto_awesome_outlined, 'Purity Exchange', onTap: () => context.push('/customization')),
                         _profileItem(Icons.settings_outlined, 'Settings', onTap: () => _showSettings(context)),
+                        _profileItem(Icons.card_giftcard_outlined, 'Redeem Coupon', onTap: () => _showCouponRedeemDialog(context, ref)),
                         _profileItem(Icons.policy_outlined, 'Privacy Policy', onTap: () => _showPrivacy(context)),
                         _profileItem(Icons.delete_forever_outlined, 'Reset Progress & Data', isDestructive: true, onTap: () => _showResetConfirm(context, ref)),
                         const SizedBox(height: 24),
@@ -246,7 +248,28 @@ class ProfileScreen extends ConsumerWidget {
   void _showPrivacy(BuildContext context) {
     _showModal(context, 'PRIVACY POLICY', SingleChildScrollView(
       child: Text(
-        "AQUA SORT PRIVACY POLICY\n\n1. Data Collection: We only store your game progress, level unlocks, and coin count locally on your device via SharedPreferences. If you create an account, we store your username and hashed password on our secure servers.\n\n2. Usage: This data is used solely to provide game progression and leaderboard features.\n\n3. Third Parties: We do not share your personal data with any third-party services.\n\n4. Permissions: The app requires internet access for account registration and leaderboards.\n\nFor more info, contact webspiderstudios@gmail.com",
+        "PRIVACY POLICY\nLast Updated: August 2026\n\n"
+        "WebSpider Studios ('we', 'our', 'us') operates Aqua Sort. This policy explains what data we collect, why, and your rights.\n\n"
+        "1. INFORMATION WE COLLECT\n"
+        "a) Account Data (if registered):\n   - Email, display name, optional phone/avatar.\n\n"
+        "b) Game Progress: Coin balance, skins, levels, history — stored securely on Google Cloud Firestore and locally on your device.\n\n"
+        "c) Advertising (AdMob by Google): When viewing ads, Google may collect your device Advertising ID, IP address, and usage signals. Opt out via: Device Settings > Privacy > Ads.\n\n"
+        "d) In-App Purchases: Processed by Google Play. We never see your card details — only a purchase confirmation.\n\n"
+        "e) Leaderboard Data: Your display name and score may be visible to other players.\n\n"
+        "2. THIRD-PARTY SERVICES\n"
+        "   - Google Firebase & Cloud Firestore: encrypted database & authentication backend.\n"
+        "   - Google AdMob: advertising (policies.google.com/privacy).\n"
+        "   - Google Play Games: achievements & leaderboards.\n"
+        "   - Meta (Facebook): social login integration.\n"
+        "   We do NOT sell your data.\n\n"
+        "3. YOUR RIGHTS (GDPR / CCPA)\n"
+        "   - Access, correct, or delete your data at any time.\n"
+        "   - Request account deletion by visiting webspiderstudios.com/data-deletion.\n\n"
+        "4. CHILDREN'S PRIVACY\n"
+        "   Rated 7+. We do not knowingly collect data from children under 13 without parental consent.\n\n"
+        "5. SECURITY\n"
+        "   TLS/SSL encryption on all transmissions. Google Cloud Security Rules ensure complete data isolation.\n\n"
+        "CONTACT: support@webspiderstudios.com",
         style: GoogleFonts.outfit(color: Colors.white70, height: 1.6),
       ),
     ));
@@ -347,6 +370,117 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
       ),
+    );
+  }
+
+  void _showCouponRedeemDialog(BuildContext context, WidgetRef ref) {
+    final controller = TextEditingController();
+    bool loading = false;
+    String? error;
+
+    showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'CouponRedeem',
+      barrierColor: Colors.black.withOpacity(0.85),
+      transitionDuration: const Duration(milliseconds: 300),
+      pageBuilder: (context, anim1, anim2) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return Center(
+              child: Container(
+                margin: const EdgeInsets.all(22),
+                padding: const EdgeInsets.all(24),
+                constraints: const BoxConstraints(maxWidth: 450),
+                decoration: BoxDecoration(
+                  color: AppColors.deepNavy,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: AppColors.cyanGlow.withOpacity(0.3)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.cyanGlow.withOpacity(0.1),
+                      blurRadius: 20,
+                    )
+                  ],
+                ),
+                child: Material(
+                  color: Colors.transparent,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Redeem Coupon', style: GoogleFonts.righteous(fontSize: 20, color: Colors.white, letterSpacing: 1.5)),
+                          IconButton(icon: const Icon(Icons.close, color: Colors.white54), onPressed: () => Navigator.pop(context)),
+                        ],
+                      ),
+                      const Divider(color: Colors.white10, height: 32),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Enter your promo code below to claim your coins/rewards!',
+                        style: GoogleFonts.outfit(color: AppColors.textSecondary, fontSize: 13),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      AquaField(
+                        label: 'Coupon Code',
+                        hint: 'e.g. WELCOME100',
+                        controller: controller,
+                        validator: (v) => v == null || v.trim().isEmpty ? 'Required' : null,
+                      ),
+                      if (error != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          error!,
+                          style: GoogleFonts.outfit(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      GlowButton(
+                        label: 'Claim Reward',
+                        icon: Icons.card_giftcard_rounded,
+                        loading: loading,
+                        onTap: () async {
+                          final code = controller.text.trim();
+                          if (code.isEmpty) return;
+
+                          setDialogState(() {
+                            loading = true;
+                            error = null;
+                          });
+
+                          await ref.read(couponProvider.notifier).redeemCoupon(code);
+                          final state = ref.read(couponProvider);
+
+                          if (state.error != null) {
+                            setDialogState(() {
+                              loading = false;
+                              error = state.error;
+                            });
+                          } else if (state.coinsAwarded != null) {
+                            Navigator.pop(context); // Close dialog
+                            
+                            // Show success message
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Success! Awarded +${state.coinsAwarded} Coins! 🎉'),
+                                backgroundColor: AppColors.tealAccent.withOpacity(0.8),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

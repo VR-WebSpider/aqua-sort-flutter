@@ -9,8 +9,7 @@ import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
 import 'package:aqua_sort/features/game/providers/game_provider.dart';
 import 'package:aqua_sort/features/game/engine/game_engine.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'dart:math' as math;
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class MultiplayerLobbyScreen extends ConsumerStatefulWidget {
   const MultiplayerLobbyScreen({super.key});
@@ -196,7 +195,7 @@ class _MultiplayerLobbyScreenState extends ConsumerState<MultiplayerLobbyScreen>
 
   Future<void> _declineChallenge(Room room) async {
     try {
-      await Supabase.instance.client.from('rooms').delete().eq('id', room.id);
+      await FirebaseFirestore.instance.collection('rooms').doc(room.id).delete();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -301,6 +300,7 @@ class _MultiplayerLobbyScreenState extends ConsumerState<MultiplayerLobbyScreen>
                               width: 130,
                               height: 38,
                               child: GlowButton(
+                                height: 38,
                                 label: 'CREATE ROOM',
                                 icon: Icons.add_rounded,
                                 onTap: () async {

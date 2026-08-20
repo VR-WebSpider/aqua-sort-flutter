@@ -1,4 +1,4 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// All coin denominations used across the game.
 class CoinReward {
@@ -13,16 +13,20 @@ class WalletService {
   static final WalletService instance = WalletService._();
   WalletService._();
 
-  final SupabaseClient _db = Supabase.instance.client;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   // ── Read ──────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> fetchWallet(String userId) async {
-    return await _db
-        .from('profiles')
-        .select('coins, owned_skins')
-        .eq('id', userId)
-        .maybeSingle();
+    try {
+      final doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists && doc.data() != null) {
+        return doc.data()!;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ── Write ─────────────────────────────────────────────────────────────────
@@ -36,17 +40,20 @@ class WalletService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      // Atomic increment via RPC (or manual read-modify-write)
-      final profile = await _db
-          .from('profiles')
-          .select('coins')
-          .eq('id', userId)
-          .single();
+      final userRef = _firestore.collection('users').doc(userId);
+      
+      final newBalance = await _firestore.runTransaction<int>((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final currentCoins = (snapshot.data()?['coins'] as num?)?.toInt() ?? 0;
+        final updatedCoins = currentCoins + amount;
+        
+        transaction.set(userRef, {
+          'coins': updatedCoins,
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
 
-      final current = (profile['coins'] as num?)?.toInt() ?? 0;
-      final newBalance = current + amount;
-
-      await _db.from('profiles').update({'coins': newBalance}).eq('id', userId);
+        return updatedCoins;
+      });
 
       await _logTransaction(
         userId: userId,
@@ -57,12 +64,12 @@ class WalletService {
       );
 
       return newBalance;
-    } catch (_) {
+    } catch (e) {
       return null;
     }
   }
 
-  /// Update any WebSpider currency type in the cloud database via RPC.
+  /// Update any WebSpider currency type in Cloud Firestore.
   /// Returns the new balance on success, or null on failure.
   Future<int?> updateWebSpiderCurrency({
     required String userId,
@@ -72,62 +79,134 @@ class WalletService {
     String gameId = 'aqua_sort',
   }) async {
     try {
-      final response = await _db.rpc(
-        'update_webspider_currency_v1',
-        params: {
-          'p_user_id': userId,
-          'p_currency_type': currencyType,
-          'p_amount': amount,
-          'p_reason': reason,
-          'p_game_id': gameId,
-        },
+      final userRef = _firestore.collection('users').doc(userId);
+      final fieldName = 'webspider_${currencyType.toLowerCase()}_coins';
+
+      final newBalance = await _firestore.runTransaction<int>((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final current = (snapshot.data()?[fieldName] as num?)?.toInt() ?? 0;
+        final updated = current + amount;
+
+        transaction.set(userRef, {
+          fieldName: updated,
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        return updated;
+      });
+
+      await _logTransaction(
+        userId: userId,
+        type: amount >= 0 ? 'credit' : 'debit',
+        amount: amount.abs(),
+        reason: '$reason ($currencyType)',
+        metadata: {'game_id': gameId, 'currency_type': currencyType},
       );
-      return (response as num?)?.toInt();
-    } catch (_) {
+
+      return newBalance;
+    } catch (e) {
       return null;
     }
   }
 
   /// Claim the daily streak reward atomically.
-  /// Returns a Map containing the claim results (success, streak_count, reward_type, reward_amount, etc.).
+  /// Returns a Map containing the claim results.
   Future<Map<String, dynamic>?> claimDailyReward({required String userId}) async {
     try {
-      final response = await _db.rpc(
-        'claim_daily_reward_v1',
-        params: {
-          'p_user_id': userId,
-        },
-      );
-      if (response is Map) {
-        return Map<String, dynamic>.from(response);
-      }
-      return null;
+      final userRef = _firestore.collection('users').doc(userId);
+      
+      final result = await _firestore.runTransaction<Map<String, dynamic>>((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final data = snapshot.data() ?? {};
+        
+        final lastClaimTimestamp = (data['last_daily_claim_at'] as Timestamp?)?.toDate();
+        final now = DateTime.now();
+
+        if (lastClaimTimestamp != null) {
+          final difference = now.difference(lastClaimTimestamp);
+          // If claimed less than 20 hours ago, cooldown is active
+          if (difference.inHours < 20) {
+            return {
+              'success': false,
+              'reason': 'cooldown_active',
+              'next_available_in_hours': 20 - difference.inHours,
+            };
+          }
+        }
+
+        int currentStreak = (data['daily_streak_count'] as num?)?.toInt() ?? 0;
+        // If last claim was more than 48 hours ago, reset streak
+        if (lastClaimTimestamp != null && now.difference(lastClaimTimestamp).inHours > 48) {
+          currentStreak = 0;
+        }
+
+        final nextStreak = (currentStreak % 7) + 1;
+        final totalClaims = ((data['total_daily_claims'] as num?)?.toInt() ?? 0) + 1;
+
+        // Reward tiers based on streak day
+        final int rewardCoins = CoinReward.dailyClaim * nextStreak;
+        final int currentCoins = (data['coins'] as num?)?.toInt() ?? 0;
+
+        transaction.set(userRef, {
+          'coins': currentCoins + rewardCoins,
+          'daily_streak_count': nextStreak,
+          'total_daily_claims': totalClaims,
+          'last_daily_claim_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        return {
+          'success': true,
+          'streak_count': nextStreak,
+          'total_claims': totalClaims,
+          'reward_amount': rewardCoins,
+          'new_coins': currentCoins + rewardCoins,
+        };
+      });
+
+      return result;
     } catch (e) {
-      print('Error claiming daily reward: $e');
       return null;
     }
   }
 
   /// Claim a lifetime milestone reward chest.
-  /// Returns a Map containing the claim results (success, claimed_milestones, rewards, etc.).
   Future<Map<String, dynamic>?> claimMilestoneReward({
     required String userId,
     required String milestoneId,
   }) async {
     try {
-      final response = await _db.rpc(
-        'claim_milestone_reward_v1',
-        params: {
-          'p_user_id': userId,
-          'p_milestone_id': milestoneId,
-        },
-      );
-      if (response is Map) {
-        return Map<String, dynamic>.from(response);
-      }
-      return null;
+      final userRef = _firestore.collection('users').doc(userId);
+
+      final result = await _firestore.runTransaction<Map<String, dynamic>>((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final data = snapshot.data() ?? {};
+        final claimed = List<String>.from(data['claimed_milestones'] ?? []);
+
+        if (claimed.contains(milestoneId)) {
+          return {'success': false, 'reason': 'already_claimed'};
+        }
+
+        claimed.add(milestoneId);
+        final int bonusCoins = 150;
+        final currentCoins = (data['coins'] as num?)?.toInt() ?? 0;
+
+        transaction.set(userRef, {
+          'coins': currentCoins + bonusCoins,
+          'claimed_milestones': claimed,
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        return {
+          'success': true,
+          'milestone_id': milestoneId,
+          'bonus_coins': bonusCoins,
+          'new_coins': currentCoins + bonusCoins,
+        };
+      });
+
+      return result;
     } catch (e) {
-      print('Error claiming milestone reward: $e');
       return null;
     }
   }
@@ -148,8 +227,7 @@ class WalletService {
     );
   }
 
-  /// Spend coins and mark skin as owned. Server-side guards via RLS.
-  /// Returns true on success, false on insufficient funds or already owned.
+  /// Spend coins and mark skin as owned.
   Future<bool> purchaseSkin({
     required String userId,
     required String skinId,
@@ -157,34 +235,25 @@ class WalletService {
     required List<String> currentOwnedSkins,
   }) async {
     try {
-      final profile = await _db
-          .from('profiles')
-          .select('coins, owned_skins')
-          .eq('id', userId)
-          .single();
+      final userRef = _firestore.collection('users').doc(userId);
 
-      final coins = (profile['coins'] as num?)?.toInt() ?? 0;
-      final owned = List<String>.from(profile['owned_skins'] ?? []);
+      return await _firestore.runTransaction<bool>((transaction) async {
+        final snapshot = await transaction.get(userRef);
+        final data = snapshot.data() ?? {};
+        final coins = (data['coins'] as num?)?.toInt() ?? 0;
+        final owned = List<String>.from(data['owned_skins'] ?? ['default']);
 
-      if (coins < price || owned.contains(skinId)) return false;
+        if (coins < price || owned.contains(skinId)) return false;
 
-      final newBalance = coins - price;
-      owned.add(skinId);
+        owned.add(skinId);
+        transaction.set(userRef, {
+          'coins': coins - price,
+          'owned_skins': owned,
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
 
-      await _db.from('profiles').update({
-        'coins': newBalance,
-        'owned_skins': owned,
-      }).eq('id', userId);
-
-      await _logTransaction(
-        userId: userId,
-        type: 'debit',
-        amount: price,
-        reason: 'skin_purchase',
-        metadata: {'skin_id': skinId},
-      );
-
-      return true;
+        return true;
+      });
     } catch (_) {
       return false;
     }
@@ -200,15 +269,16 @@ class WalletService {
     Map<String, dynamic>? metadata,
   }) async {
     try {
-      await _db.from('transactions').insert({
+      await _firestore.collection('transactions').add({
         'user_id': userId,
         'type': type,
         'amount': amount,
         'reason': reason,
         'metadata': metadata ?? {},
+        'created_at': FieldValue.serverTimestamp(),
       });
     } catch (_) {
-      // Non-fatal; audit log failure should not break the game.
+      // Non-fatal audit log
     }
   }
 

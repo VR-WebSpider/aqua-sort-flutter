@@ -1,0 +1,8 @@
+- [x] Task 1: Create Supabase DB schemas & RLS for coupons, config, announcements
+- [x] Task 2: Configure Flutter pubspec.yaml dependencies (in_app_update, onesignal_flutter)
+- [x] Task 3: Implement Remote Config & In-App Update services in Flutter
+- [x] Task 4: Design Glassmorphic Announcement popup dialog & provider
+- [x] Task 5: Build Coupon redemption provider & profile redemption dialog
+- [x] Task 6: Configure OneSignal push notifications and user external ID mapping
+- [x] Task 7: Set up database trigger webhooks for Resend email notifications
+- [x] Task 8: Verify build and compile correctness via flutter analyze

@@ -7,7 +7,6 @@ import 'package:country_code_picker/country_code_picker.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
 import 'package:aqua_sort/features/auth/screens/legal_screen.dart';
-import 'package:supabase_flutter/supabase_flutter.dart' show OAuthProvider;
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -30,41 +29,123 @@ class _RegisterState extends ConsumerState<RegisterScreen> {
 
   final String _privacyText = """
 PRIVACY POLICY
-Last Updated: April 14, 2026
+Last Updated: July 8, 2026
 
-WebSpider Studios is committed to protecting your privacy.
+WebSpider Studios ("we", "our", "us") operates Aqua Sort. This policy explains what data we collect, why we collect it, and your rights.
 
-1. Information We Collect:
-- Core Identity: Email Address and Phone Number (optional).
-- Game Status: Coin balance, owned skins, and leaderboard scores.
-- Security Logs: Verification attempts and challenges.
+1. INFORMATION WE COLLECT
 
-2. Security:
-Any changes to your core identity are gated by our 'Zero Casualization' security protocol.
+a) Account Data (if you register):
+   - Email address — used for authentication and account recovery.
+   - Display name — shown publicly on leaderboards.
+   - Phone number — optional, used only for two-factor security.
+   - Profile avatar — optional image you upload.
 
-3. Data Storage:
-Store using Supabase with enterprise-grade encryption and RLS.
+b) Game Progress Data:
+   - Coin balance, owned skins, unlocked levels, game history.
+   - Stored on our Supabase backend (linked to your account) and locally on your device.
 
-Contact: webspiderstudios@gmail.com
+c) Advertising Data (AdMob by Google):
+   - When you view advertisements, Google's AdMob SDK may collect your device's Advertising ID, IP address, and usage signals to serve relevant ads.
+   - You may opt out of personalised ads through your device settings (Settings > Privacy > Ads).
+
+d) In-App Purchase Data:
+   - Transactions are processed by Google Play. We do not collect or store your payment card details. We receive only a confirmation of purchase to unlock content.
+
+e) Multiplayer & Leaderboard Data:
+   - Your display name and score are stored on our servers and may be visible to other players on public leaderboards.
+
+f) Diagnostic Data:
+   - App crash reports and error logs (anonymous, no personal data) to improve stability.
+
+2. HOW WE USE YOUR DATA
+   - To authenticate you and save your game progress across devices.
+   - To display your rank on leaderboards (display name only).
+   - To serve advertisements through Google AdMob.
+   - To fulfil in-app purchases via Google Play Billing.
+   - To improve app stability and fix bugs.
+
+3. DATA SHARING & THIRD PARTIES
+   - Supabase (supabase.com) — Our secure database backend. Data is encrypted at rest and in transit.
+   - Google AdMob — Advertising platform. See Google's privacy policy at policies.google.com/privacy.
+   - Google Play Games Services — Used for achievements and leaderboards.
+   - We do NOT sell your personal data to any third parties.
+
+4. DATA RETENTION
+   - Your account data is retained as long as your account exists.
+   - You may request deletion of your account and all associated data at any time.
+
+5. YOUR RIGHTS (GDPR / CCPA)
+   - Access: Request a copy of the data we hold about you.
+   - Correction: Request correction of inaccurate data.
+   - Deletion: Request deletion of your account and all personal data.
+   - Opt-Out of Ads: Disable personalised advertising in your device settings.
+
+6. CHILDREN'S PRIVACY
+   - This app is rated for users aged 7 and above. We do not knowingly collect personal data from children under 13 without parental consent. If you believe a child has provided personal data, contact us immediately.
+
+7. SECURITY
+   - All data transmissions use TLS/SSL encryption.
+   - Account changes are protected by our email-verified security protocol.
+   - We use Supabase Row Level Security (RLS) to ensure users can only access their own data.
+
+8. CONTACT
+   - Email: webspiderstudios@gmail.com
+   - You may also contact us to exercise any of your rights above.
 """;
 
   final String _eulaText = """
-USER AGREEMENT (EULA)
-Last Updated: April 14, 2026
+END-USER LICENSE AGREEMENT (EULA)
+Last Updated: July 8, 2026
 
-1. License Grant:
-Personal, non-exclusive license to play Aqua Sort for entertainment.
+This EULA is a legal agreement between you and WebSpider Studios for the use of Aqua Sort.
 
-2. Account Security:
-You are responsible for your credentials and agree to the 'Zero Casualization' security requirements.
+1. LICENSE GRANT
+We grant you a personal, non-exclusive, non-transferable, revocable license to install and play Aqua Sort on Android devices you own or control, solely for personal, non-commercial entertainment.
 
-3. Virtual Goods:
-Coins and Skins have no real-world monetary value.
+2. ACCOUNT & SECURITY
+   - You are responsible for maintaining the confidentiality of your account credentials.
+   - You agree to our email-verified security protocol for all sensitive account changes.
+   - Guest accounts are not backed up. Progress may be lost if the app is uninstalled.
 
-4. Fair Play:
-Cheating or exploiting results in account termination.
+3. IN-APP PURCHASES & VIRTUAL GOODS
+   - Aqua Sort offers optional in-app purchases (coin packs, premium subscription) through Google Play Billing.
+   - All purchases are final. Refunds are handled by Google Play's refund policy.
+   - Virtual currency (Coins) and cosmetic items (Skins) have no real-world monetary value and cannot be exchanged for cash.
+   - Premium subscriptions auto-renew unless cancelled at least 24 hours before the renewal date.
 
-Contact: webspiderstudios@gmail.com
+4. ADVERTISEMENTS
+   - The free version of Aqua Sort displays ads provided by Google AdMob.
+   - Purchasing Premium removes all advertisements.
+   - You may control personalised ad preferences through your device's advertising settings.
+
+5. MULTIPLAYER & ONLINE FEATURES
+   - Online multiplayer and leaderboard features require an internet connection and a registered account.
+   - Online features are provided "as-is" and may be subject to availability.
+
+6. FEATURES IN DEVELOPMENT
+   - Some features (including certain multiplayer enhancements) are actively being developed and may evolve or change in future updates.
+
+7. FAIR PLAY & PROHIBITED CONDUCT
+   - Cheating, hacking, exploiting bugs, or using automated tools is strictly prohibited.
+   - Offensive display names or harassment of other players will result in account suspension or termination.
+
+8. INTELLECTUAL PROPERTY
+   - All game content, artwork, code, and audio are the intellectual property of WebSpider Studios. You may not copy, modify, or distribute any content without written permission.
+
+9. TERMINATION
+   - We reserve the right to suspend or terminate accounts that violate this agreement without prior notice.
+
+10. DISCLAIMER OF WARRANTIES
+    - The app is provided "as is" without any warranty of uninterrupted or error-free operation.
+
+11. LIMITATION OF LIABILITY
+    - To the maximum extent permitted by law, WebSpider Studios shall not be liable for any indirect, incidental, or consequential damages arising from your use of the app.
+
+12. GOVERNING LAW
+    - This agreement is governed by applicable law. Disputes shall be resolved through good-faith negotiation before any legal action.
+
+CONTACT: webspiderstudios@gmail.com
 """;
 
   @override
@@ -293,21 +374,17 @@ Contact: webspiderstudios@gmail.com
                     return;
                   }
                   if (_form.currentState!.validate()) {
-                    setState(() => _isSubmitting = true);
                     try {
-                      final fullPhone = _phone.text.isEmpty ? null : '$_countryCode${_phone.text}';
-                      await ref.read(authProvider.notifier).signUp(
-                        _email.text, 
-                        _pass.text,
-                        phone: fullPhone,
-                        allowPhoneLogin: _allowPhoneLogin,
-                        allowUsernameLogin: _allowUsernameLogin,
+                      setState(() => _isSubmitting = true);
+                      await ref.read(authProvider.notifier).signUpWithEmail(
+                        email: _email.text.trim(), 
+                        password: _pass.text,
+                        firstName: 'Player',
+                        lastName: '',
+                        username: _email.text.split('@').first,
                       );
                       if (mounted) {
-                        context.go('/otp', extra: {
-                          'email': _email.text,
-                          'phone': fullPhone,
-                        });
+                        context.go('/lobby');
                       }
                     } catch (e) {
                       if (mounted) {
@@ -339,7 +416,7 @@ Contact: webspiderstudios@gmail.com
                 outlined: true,
                 onTap: () async {
                   try {
-                    await ref.read(authProvider.notifier).signInWithSocial(OAuthProvider.google);
+                    await ref.read(authProvider.notifier).signInWithGoogle();
                     if (mounted) context.go('/lobby');
                   } catch (e) {
                     if (mounted) {
@@ -357,7 +434,7 @@ Contact: webspiderstudios@gmail.com
                 outlined: true,
                 onTap: () async {
                   try {
-                    await ref.read(authProvider.notifier).signInWithSocial(OAuthProvider.facebook);
+                    await ref.read(authProvider.notifier).signInWithFacebook();
                     if (mounted) context.go('/lobby');
                   } catch (e) {
                     if (mounted) {

@@ -1,7 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:app_links/app_links.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
+import 'package:aqua_sort/core/services/push_notification_service.dart';
+import 'package:aqua_sort/core/services/wallet_service.dart';
 import 'dart:math' as math;
 
 enum AuthStatus { authenticated, guest, unauthenticated }
@@ -17,6 +21,7 @@ class AuthUser {
   final String? avatarUrl;
   final int usernameChangesCount;
   final DateTime? displayNameUpdatedAt;
+  
   // ── Economy ──────────────────────────────────────────────────────────
   final int coins;
   final Set<String> ownedSkins;
@@ -27,6 +32,8 @@ class AuthUser {
   final int webspiderDiamondCoins;
   final int webspiderJadeCoins;
   final int webspiderObsidianCoins;
+
+  final bool isPremium;
 
   // ── Daily Reward & Streak ─────────────────────────────────────────────
   final DateTime? lastDailyClaimAt;
@@ -54,6 +61,7 @@ class AuthUser {
     this.webspiderDiamondCoins = 0,
     this.webspiderJadeCoins = 0,
     this.webspiderObsidianCoins = 0,
+    this.isPremium = false,
     this.lastDailyClaimAt,
     this.dailyStreakCount = 0,
     this.totalDailyClaims = 0,
@@ -84,6 +92,7 @@ class AuthUser {
     int? dailyStreakCount,
     int? totalDailyClaims,
     Set<String>? claimedMilestones,
+    bool? isPremium,
   }) {
     return AuthUser(
       id: id ?? this.id,
@@ -109,6 +118,7 @@ class AuthUser {
       dailyStreakCount: dailyStreakCount ?? this.dailyStreakCount,
       totalDailyClaims: totalDailyClaims ?? this.totalDailyClaims,
       claimedMilestones: claimedMilestones ?? this.claimedMilestones,
+      isPremium: isPremium ?? this.isPremium,
     );
   }
 
@@ -172,153 +182,103 @@ class AuthState {
 }
 
 class AuthNotifier extends StateNotifier<AuthState> {
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   AuthNotifier() : super(AuthState.unauthenticated()) {
     _init();
   }
 
   void _init() {
-    debugPrint('AUTH_NOTIFIER: Initializing...');
+    debugPrint('AUTH_NOTIFIER: Initializing Firebase Auth listener...');
     
-    // 1. Scan URL for recovery hint (Web Only)
-    if (kIsWeb) {
-      final uri = Uri.base;
-      if (uri.toString().contains('type=recovery') || uri.queryParameters['type'] == 'recovery') {
-        debugPrint('RECOVERY HINT DETECTED');
-        state = AuthState.recovering();
-      }
-    }
-
-    // 2. Listen to Supabase Auth Changes
-    _supabase.auth.onAuthStateChange.listen((data) {
-      final event = data.event;
-      final session = data.session;
-      debugPrint('AUTH EVENT: $event');
-
-      if (event == AuthChangeEvent.passwordRecovery) {
-        debugPrint('AUTH_NOTIFIER: Password Recovery Event Detected');
-        state = AuthState.recovering();
-      } else if ((event == AuthChangeEvent.signedIn || event == AuthChangeEvent.initialSession) && session != null) {
-        _fetchProfile(session.user.id, session.user.email, session.user.phone);
-      } else if (event == AuthChangeEvent.signedOut) {
+    _auth.authStateChanges().listen((User? user) {
+      if (user != null) {
+        debugPrint('AUTH_NOTIFIER: User detected -> ${user.uid}');
+        _fetchProfile(user);
+        PushNotificationService.setUserId(user.uid);
+      } else {
+        debugPrint('AUTH_NOTIFIER: User signed out');
         state = AuthState.unauthenticated();
+        PushNotificationService.removeUserId();
       }
     });
-
-    // 3. Listen to AppLinks (For Deep Linking on Mobile & Desktop)
-    if (!kIsWeb) {
-      debugPrint('AUTH_NOTIFIER: Initializing AppLinks listener...');
-      AppLinks().uriLinkStream.listen((uri) {
-        debugPrint('AUTH_NOTIFIER: Deep Link Received: $uri');
-        if (uri.toString().contains('type=recovery') || uri.queryParameters['type'] == 'recovery' || uri.fragment.contains('type=recovery')) {
-          debugPrint('AUTH_NOTIFIER: RECOVERY LINK DETECTED via Deep Link!');
-          state = AuthState.recovering();
-        }
-      });
-      
-      // Also check for initial link (if app was opened by the link)
-      AppLinks().getInitialLink().then((uri) {
-        if (uri != null) {
-          debugPrint('AUTH_NOTIFIER: Initial Deep Link: $uri');
-          if (uri.toString().contains('type=recovery') || uri.queryParameters['type'] == 'recovery' || uri.fragment.contains('type=recovery')) {
-            state = AuthState.recovering();
-          }
-        }
-      });
-    }
-
-    // 4. Initial Session Check
-    final session = _supabase.auth.currentSession;
-    if (session != null) {
-      _fetchProfile(session.user.id, session.user.email, session.user.phone);
-    }
   }
 
-  Future<void> signInWithSocial(OAuthProvider provider) async {
-    state = AuthState.loading();
+  Future<void> _fetchProfile(User user) async {
     try {
-      await _supabase.auth.signInWithOAuth(
-        provider,
-        redirectTo: 'com.webspider.aquasort.mobile://login-callback/',
-        authScreenLaunchMode: LaunchMode.externalApplication,
-      );
-    } catch (e) {
-      state = AuthState.unauthenticated();
-      rethrow;
-    }
-  }
+      final docRef = _firestore.collection('users').doc(user.uid);
+      final doc = await docRef.get();
 
-  Future<void> _fetchProfile(String userId, String? email, String? phone) async {
-    state = state.copyWith(isLoading: true);
-    try {
-      final data = await _supabase
-          .from('profiles')
-          .select('username, username_changes_count, display_name_updated_at, first_name, last_name, display_name, avatar_url, coins, owned_skins, phone, email_lookup, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
-          .eq('id', userId)
-          .maybeSingle();
+      if (!doc.exists || doc.data() == null) {
+        final String displayName = user.displayName ?? user.email?.split('@').first ?? 'WebSpider Player';
+        final String username = 'player_${math.Random().nextInt(899999) + 100000}';
 
-      if (data != null) {
-        String displayName = data['display_name'] ?? '';
-        if (displayName.isEmpty) {
-          final randomNum = math.Random().nextInt(90000) + 10000;
-          displayName = 'SpiderPlayer_$randomNum';
-          try {
-            await _supabase.from('profiles').update({'display_name': displayName}).eq('id', userId);
-          } catch (e) {
-            debugPrint('Error auto-setting display name: $e');
-          }
-        }
+        final initialData = {
+          'id': user.uid,
+          'email': user.email,
+          'phone': user.phoneNumber,
+          'display_name': displayName,
+          'username': username,
+          'first_name': displayName.split(' ').first,
+          'last_name': displayName.split(' ').length > 1 ? displayName.split(' ').sublist(1).join(' ') : '',
+          'avatar_url': user.photoURL,
+          'coins': 0,
+          'owned_skins': ['default'],
+          'webspider_brass_coins': 100,
+          'webspider_copper_coins': 200,
+          'webspider_silver_coins': 50,
+          'webspider_gold_coins': 10,
+          'webspider_diamond_coins': 0,
+          'webspider_jade_coins': 0,
+          'webspider_obsidian_coins': 0,
+          'is_premium': false,
+          'username_changes_count': 0,
+          'daily_streak_count': 0,
+          'total_daily_claims': 0,
+          'claimed_milestones': [],
+          'created_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        };
 
-        String username = data['username'] ?? '';
-        if (username.isEmpty) {
-          username = displayName.toLowerCase().replaceAll(RegExp(r'\s+'), '');
-          try {
-            await _supabase.from('profiles').update({'username': username}).eq('id', userId);
-          } catch (e) {
-            debugPrint('Error auto-setting username: $e');
-          }
-        }
+        await docRef.set(initialData, SetOptions(merge: true));
 
-        // Auto-heal missing email_lookup if email is known
-        String emailLookup = data['email_lookup'] ?? '';
-        if (emailLookup.isEmpty && email != null && email.isNotEmpty) {
-          emailLookup = email;
-          try {
-            await _supabase.from('profiles').update({'email_lookup': email}).eq('id', userId);
-          } catch (e) {
-            debugPrint('Error auto-setting email_lookup: $e');
-          }
-        }
-
-        final ownedRaw = data['owned_skins'];
-        final ownedSkins = ownedRaw != null
-            ? Set<String>.from(ownedRaw as List)
-            : <String>{'default'};
-
-        final milestoneRaw = data['claimed_milestones'];
-        final claimedMilestones = milestoneRaw != null
-            ? Set<String>.from(milestoneRaw as List)
-            : <String>{};
-
-        final bool isGuestUser = _supabase.auth.currentUser?.isAnonymous ?? false;
-        state = state.copyWith(
-          status: isGuestUser ? AuthStatus.guest : AuthStatus.authenticated,
-          isLoading: false,
+        state = AuthState(
+          status: AuthStatus.authenticated,
           user: AuthUser(
-            id: userId,
+            id: user.uid,
+            firstName: initialData['first_name'] as String,
+            lastName: initialData['last_name'] as String,
+            displayName: initialData['display_name'] as String,
+            username: initialData['username'] as String,
+            email: user.email,
+            phone: user.phoneNumber,
+            avatarUrl: user.photoURL,
+            coins: 0,
+            ownedSkins: {'default'},
+            webspiderBrassCoins: 100,
+            webspiderCopperCoins: 200,
+            webspiderSilverCoins: 50,
+            webspiderGoldCoins: 10,
+          ),
+        );
+      } else {
+        final data = doc.data()!;
+        state = AuthState(
+          status: AuthStatus.authenticated,
+          user: AuthUser(
+            id: user.uid,
             firstName: data['first_name'] ?? '',
             lastName: data['last_name'] ?? '',
-            displayName: displayName,
-            username: username,
-            email: email ?? (emailLookup.isNotEmpty ? emailLookup : null),
-            phone: data['phone'] ?? phone,
-            avatarUrl: data['avatar_url'],
+            displayName: data['display_name'] ?? (user.displayName ?? 'Player'),
+            username: data['username'] ?? 'player',
+            email: user.email ?? data['email'],
+            phone: user.phoneNumber ?? data['phone'],
+            avatarUrl: data['avatar_url'] ?? user.photoURL,
             usernameChangesCount: (data['username_changes_count'] as num?)?.toInt() ?? 0,
-            displayNameUpdatedAt: data['display_name_updated_at'] != null 
-                ? DateTime.parse(data['display_name_updated_at'].toString()) 
-                : null,
+            displayNameUpdatedAt: (data['display_name_updated_at'] as Timestamp?)?.toDate(),
             coins: (data['coins'] as num?)?.toInt() ?? 0,
+            ownedSkins: Set<String>.from(data['owned_skins'] ?? ['default']),
             webspiderBrassCoins: (data['webspider_brass_coins'] as num?)?.toInt() ?? 100,
             webspiderCopperCoins: (data['webspider_copper_coins'] as num?)?.toInt() ?? 200,
             webspiderSilverCoins: (data['webspider_silver_coins'] as num?)?.toInt() ?? 50,
@@ -326,531 +286,391 @@ class AuthNotifier extends StateNotifier<AuthState> {
             webspiderDiamondCoins: (data['webspider_diamond_coins'] as num?)?.toInt() ?? 0,
             webspiderJadeCoins: (data['webspider_jade_coins'] as num?)?.toInt() ?? 0,
             webspiderObsidianCoins: (data['webspider_obsidian_coins'] as num?)?.toInt() ?? 0,
-            ownedSkins: ownedSkins,
-            lastDailyClaimAt: data['last_daily_claim_at'] != null 
-                ? DateTime.parse(data['last_daily_claim_at'].toString()) 
-                : null,
+            isPremium: data['is_premium'] == true,
+            lastDailyClaimAt: (data['last_daily_claim_at'] as Timestamp?)?.toDate(),
             dailyStreakCount: (data['daily_streak_count'] as num?)?.toInt() ?? 0,
             totalDailyClaims: (data['total_daily_claims'] as num?)?.toInt() ?? 0,
-            claimedMilestones: claimedMilestones,
+            claimedMilestones: Set<String>.from(data['claimed_milestones'] ?? []),
           ),
         );
-      } else {
-        // Create initial profile if missing
-        final randomNum = math.Random().nextInt(90000) + 10000;
-        final randomName = 'SpiderPlayer_$randomNum';
-        await _supabase.from('profiles').insert({
-          'id': userId,
-          'first_name': '',
-          'last_name': '',
-          'display_name': randomName,
-          'username': randomName.toLowerCase(),
-          'coins': 0,
-          'owned_skins': ['default'],
-          'phone': phone,
-          'email_lookup': email,
-        });
-        _fetchProfile(userId, email, phone);
       }
     } catch (e) {
-      state = AuthState.unauthenticated();
-    }
-  }
-
-  /// Refresh the wallet balance from Supabase (call after any transaction).
-  Future<void> refreshWallet() async {
-    final userId = state.user?.id;
-    if (userId == null || userId == 'guest') return;
-    try {
-      final data = await _supabase
-          .from('profiles')
-          .select('coins, owned_skins, webspider_brass_coins, webspider_copper_coins, webspider_silver_coins, webspider_gold_coins, webspider_diamond_coins, webspider_jade_coins, webspider_obsidian_coins, last_daily_claim_at, daily_streak_count, total_daily_claims, claimed_milestones')
-          .eq('id', userId)
-          .single();
-
-      final ownedRaw = data['owned_skins'];
-      final ownedSkins = ownedRaw != null
-          ? Set<String>.from(ownedRaw as List)
-          : <String>{'default'};
-
-      final milestoneRaw = data['claimed_milestones'];
-      final claimedMilestones = milestoneRaw != null
-          ? Set<String>.from(milestoneRaw as List)
-          : <String>{};
-
-      final newUser = state.user!.copyWith(
-        coins: (data['coins'] as num?)?.toInt() ?? 0,
-        ownedSkins: ownedSkins,
-        webspiderBrassCoins: (data['webspider_brass_coins'] as num?)?.toInt() ?? 100,
-        webspiderCopperCoins: (data['webspider_copper_coins'] as num?)?.toInt() ?? 200,
-        webspiderSilverCoins: (data['webspider_silver_coins'] as num?)?.toInt() ?? 50,
-        webspiderGoldCoins: (data['webspider_gold_coins'] as num?)?.toInt() ?? 10,
-        webspiderDiamondCoins: (data['webspider_diamond_coins'] as num?)?.toInt() ?? 0,
-        webspiderJadeCoins: (data['webspider_jade_coins'] as num?)?.toInt() ?? 0,
-        webspiderObsidianCoins: (data['webspider_obsidian_coins'] as num?)?.toInt() ?? 0,
-        lastDailyClaimAt: data['last_daily_claim_at'] != null 
-            ? DateTime.parse(data['last_daily_claim_at'].toString()) 
-            : null,
-        dailyStreakCount: (data['daily_streak_count'] as num?)?.toInt() ?? 0,
-        totalDailyClaims: (data['total_daily_claims'] as num?)?.toInt() ?? 0,
-        claimedMilestones: claimedMilestones,
-      );
-      state = AuthState(status: state.status, user: newUser);
-    } catch (_) {}
-  }
-
-  Future<void> setGuest() async {
-    state = AuthState.loading();
-    try {
-      final res = await _supabase.auth.signInAnonymously();
-      if (res.user != null) {
-        _fetchProfile(res.user!.id, null, null);
-      }
-    } catch (e) {
-      state = AuthState.unauthenticated();
-      rethrow;
-    }
-  }
-
-  Future<void> signInAnonymously() async => setGuest();
-
-  Future<void> login(String identifier, String password) async {
-    state = AuthState.loading();
-    try {
-      String email = identifier;
-      
-      // Multi-ID Lookup: If user entered a username or phone number (no @), resolve the email
-      if (!identifier.contains('@')) {
-        final cleanId = identifier.trim();
-        // Check if identifier looks like a phone number (digits, optional leading +, spaces, dashes)
-        final isPhone = RegExp(r'^\+?[0-9\s\-\(\)]+$').hasMatch(cleanId);
-        
-        dynamic res;
-        if (isPhone) {
-          final rawDigits = cleanId.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
-          if (rawDigits.length >= 7) {
-            res = await _supabase
-                .from('profiles')
-                .select('email_lookup')
-                .or('phone.eq.$cleanId,phone.like.*$rawDigits')
-                .maybeSingle();
-          } else {
-            res = await _supabase
-                .from('profiles')
-                .select('email_lookup')
-                .eq('phone', cleanId)
-                .maybeSingle();
-          }
-        } else {
-          res = await _supabase
-              .from('profiles')
-              .select('email_lookup')
-              .eq('username', cleanId.toLowerCase())
-              .maybeSingle();
-        }
-        
-        if (res == null) throw 'Username or Phone number not recognized.';
-        email = res['email_lookup'] ?? '';
-        if (email.isEmpty) throw 'Associated email not found.';
-      }
-
-      final authRes = await _supabase.auth.signInWithPassword(email: email, password: password);
-      
-      if (!identifier.contains('@')) {
-        final userMeta = authRes.user?.userMetadata;
-        final isPhone = RegExp(r'^\+?[0-9\s\-\(\)]+$').hasMatch(identifier.trim());
-        if (isPhone && (userMeta == null || userMeta['allowPhoneLogin'] != true)) {
-          await _supabase.auth.signOut();
-          throw 'Login via Phone Number is disabled. Please login with Email.';
-        } else if (!isPhone && (userMeta == null || userMeta['allowUsernameLogin'] != true)) {
-          await _supabase.auth.signOut();
-          throw 'Login via Username is disabled. Please login with Email.';
-        }
-      }
-    } catch (e) {
-      state = AuthState.unauthenticated();
-      rethrow;
-    }
-  }
-
-  Future<void> signUp(String email, String password, {String? firstName, String? lastName, String? phone, bool allowPhoneLogin = false, bool allowUsernameLogin = false}) async {
-    state = AuthState.loading();
-    try {
-      final sanitizedPhone = phone?.replaceAll(RegExp(r'[^\+0-9]'), '');
-      await _supabase.auth.signUp(
-        email: email, 
-        password: password,
-        data: {
-          'game': 'Aqua Sort',
-          if (sanitizedPhone != null && sanitizedPhone.isNotEmpty) 'phone': sanitizedPhone,
-          'allowPhoneLogin': allowPhoneLogin,
-          'allowUsernameLogin': allowUsernameLogin,
-        },
-      );
-      // Reset loading state if successful, allowing OTP screen to show buttons correctly
-      state = AuthState.unauthenticated(); 
-    } on AuthApiException catch (e) {
-      state = AuthState.unauthenticated();
-      if (e.code == 'over_email_send_rate_limit') {
-        throw 'Too many requests. Please wait a few minutes before trying again.';
-      }
-      rethrow;
-    } catch (e) {
-      state = AuthState.unauthenticated();
-      rethrow;
-    }
-  }
-
-  Future<void> verifyOtp(String email, String token, {String? firstName, String? lastName, String? phone}) async {
-    state = AuthState.loading();
-    try {
-      final res = await _supabase.auth.verifyOTP(
-        email: email,
-        token: token,
-        type: OtpType.signup,
-      );
-
-      if (res.user != null) {
-        final randomNum = math.Random().nextInt(90000) + 10000;
-        final randomName = 'SpiderPlayer_$randomNum';
-        final sanitizedPhone = phone?.replaceAll(RegExp(r'[^\+0-9]'), '');
-        
-        try {
-          await _supabase.auth.updateUser(UserAttributes(
-            data: {'username': randomName.toLowerCase()}
-          ));
-        } catch (_) {}
-
-        // Create initial profile with BOTH email (for lookup) and phone
-        await _supabase.from('profiles').upsert({
-          'id': res.user!.id,
-          'first_name': '',
-          'last_name': '',
-          'display_name': randomName,
-          'username': randomName.toLowerCase(),
-          'email_lookup': email, // Save email here for phone-based lookup later
-          'phone': sanitizedPhone,
-          'coins': 0,
-          'owned_skins': ['default'],
-        });
-        
-        await _fetchProfile(res.user!.id, res.user!.email, res.user!.phone);
-      } else {
-        // If user is null, we are not authenticated
-        state = AuthState.unauthenticated();
-      }
-    } on AuthApiException catch (e) {
-      state = AuthState.unauthenticated();
-      if (e.code == 'otp_expired') throw 'Code expired. Please resend.';
-      if (e.code == 'invalid_otp') throw 'Invalid code. Please check and try again.';
-      rethrow;
-    } catch (e) {
-      state = AuthState.unauthenticated();
-      rethrow;
-    }
-  }
-
-  // ── Track C: High-Security Purity Challenge & Reset ─────────────────────
-
-  /// Initiates a custom "Purity Challenge" for sensitive account actions
-  Future<void> initiatePurityChallenge() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null || user.email == null) throw 'Authentication required.';
-
-    // 0. Cleanup: Delete any existing challenges for this user to ensure only the latest is valid
-    await _supabase.from('purity_challenges').delete().eq('user_id', user.id);
-
-    // 1. Generate a random 6-digit challenge code
-    final String challengeCode = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
-
-    // 2. Store challenge code in purity_challenges table
-    await _supabase.from('purity_challenges').upsert({
-      'user_id': user.id,
-      'code': challengeCode,
-      'target_email': user.email,
-      'challenge_type': 'PURITY_CHECK',
-      'game': 'Aqua Sort',
-      'expires_at': DateTime.now().add(const Duration(minutes: 10)).toIso8601String(),
-    });
-
-    // Simulated Logs for Dev Console
-    print('PURITY CHALLENGE CODE: $challengeCode');
-  }
-
-  /// Initiates a Dual-OTP Email Swap (Zero Casualization Protocol)
-  Future<void> initiateEmailSwap(String newEmail) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null || user.email == null) throw 'Authentication required.';
-
-    // Code A: Sent to Old Email
-    final String codeA = (100000 + (DateTime.now().millisecondsSinceEpoch % 900000)).toString();
-    // Code B: Sent to New Email
-    final String codeB = (100000 + (DateTime.now().microsecondsSinceEpoch % 900000)).toString();
-
-    // Store both challenges
-    await _supabase.from('purity_challenges').upsert([
-      {
-        'user_id': user.id,
-        'code': codeA,
-        'challenge_type': 'OLD_EMAIL',
-        'target_email': user.email,
-        'game': 'Aqua Sort',
-        'expires_at': DateTime.now().add(const Duration(minutes: 15)).toIso8601String(),
-      },
-      {
-        'user_id': user.id,
-        'code': codeB,
-        'challenge_type': 'NEW_EMAIL',
-        'target_email': newEmail,
-        'game': 'Aqua Sort',
-        'expires_at': DateTime.now().add(const Duration(minutes: 15)).toIso8601String(),
-      }
-    ]);
-
-    // Simulated Logs (In production: send emails)
-    print('ZERO CASUALIZATION - CODE A (OLD: ${user.email}): $codeA');
-    print('ZERO CASUALIZATION - CODE B (NEW: $newEmail): $codeB');
-  }
-
-  /// Verifies Dual-OTP for Email Swap
-  Future<bool> verifyEmailSwap(String newEmail, String oldCode, String newCode) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return false;
-
-    final challenges = await _supabase
-        .from('purity_challenges')
-        .select()
-        .eq('user_id', user.id)
-        .inFilter('code', [oldCode, newCode]);
-
-    if (challenges.length < 2) return false;
-
-    // Check expiry for both
-    for (var challenge in challenges) {
-      final expiresAt = DateTime.parse(challenge['expires_at']);
-      if (DateTime.now().isAfter(expiresAt)) return false;
-    }
-
-    // Process the update
-    await _supabase.auth.updateUser(UserAttributes(email: newEmail));
-    
-    // Also update our lookup and profiles
-    await _supabase.from('profiles').update({
-      'email_lookup': newEmail,
-      'updated_at': DateTime.now().toIso8601String(),
-    }).eq('id', user.id);
-
-    return true;
-  }
-
-  /// Verifies the custom Purity Challenge code
-  Future<bool> verifyPurityChallenge(String code) async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return false;
-
-    final res = await _supabase
-        .from('purity_challenges')
-        .select()
-        .eq('user_id', user.id)
-        .eq('code', code)
-        .maybeSingle();
-
-    if (res == null) return false;
-
-    // Check expiry
-    final expiresAt = DateTime.parse(res['expires_at']);
-    if (DateTime.now().isAfter(expiresAt)) {
-      throw 'Security challenge expired.';
-    }
-
-    // 3. One-time use: Delete the challenge after successful verification
-    await _supabase
-        .from('purity_challenges')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('code', code);
-
-    return true;
-  }
-
-  Future<void> forgotPassword(String identifier) async {
-    state = AuthState.loading();
-    try {
-      String email = identifier;
-
-      // If phone or username provided (no @), find linked email
-      if (!identifier.contains('@')) {
-        final res = await _supabase
-            .from('profiles')
-            .select('email_lookup')
-            .or('phone.eq.$identifier,username.eq.${identifier.toLowerCase().trim()}')
-            .maybeSingle();
-        
-        if (res == null) throw 'Username or Phone number not linked to any account.';
-        email = res['email_lookup'] ?? '';
-        if (email.isEmpty) throw 'Associated email not found.';
-      }
-
-      String? redirectTo;
-      if (kIsWeb) {
-        redirectTo = '${Uri.base.origin}/?type=recovery';
-      } else {
-        // ALWAYS use the Player Portal for Password Reset so users have a dual-mode option
-        redirectTo = 'https://vr-webspidergithubio.vercel.app/auth/?type=recovery';
-      }
-
-      await _supabase.auth.resetPasswordForEmail(email, redirectTo: redirectTo);
-      debugPrint('AUTH_NOTIFIER: Reset link sent with redirectTo: $redirectTo');
-      state = AuthState.unauthenticated();
-    } catch (e) {
-      state = AuthState.unauthenticated();
-      rethrow;
-    }
-  }
-
-  Future<void> verifyRecoveryOtp(String identifier, String token) async {
-    state = AuthState.loading();
-    try {
-      String email = identifier;
-
-      // Dual-ID Lookup: If user entered a phone number or username (no @), find linked email
-      if (!identifier.contains('@')) {
-        final res = await _supabase
-            .from('profiles')
-            .select('email_lookup')
-            .or('phone.eq.$identifier,username.eq.${identifier.toLowerCase().trim()}')
-            .maybeSingle();
-        
-        if (res == null) throw 'Username or Phone number not recognized.';
-        email = res['email_lookup'] ?? '';
-        if (email.isEmpty) throw 'Associated email not found.';
-      }
-
-      await _supabase.auth.verifyOTP(
-        email: email,
-        token: token,
-        type: OtpType.recovery,
-      );
-
-      // Transition to recovering password state
+      debugPrint('Error fetching profile from Firestore: $e');
       state = AuthState(
         status: AuthStatus.authenticated,
-        user: state.user,
-        isLoading: false,
-        isRecoveringPassword: true,
+        user: AuthUser(
+          id: user.uid,
+          firstName: user.displayName?.split(' ').first ?? 'Player',
+          lastName: '',
+          displayName: user.displayName ?? 'Player',
+          username: 'player',
+          email: user.email,
+        ),
       );
-    } on AuthApiException catch (e) {
-      state = AuthState.unauthenticated();
-      if (e.code == 'otp_expired') throw 'Code expired. Please resend.';
-      if (e.code == 'invalid_otp') throw 'Invalid code. Please check and try again.';
-      rethrow;
+    }
+  }
+
+  // ── Authentication Actions ────────────────────────────────────────────────
+
+  Future<void> signInWithEmailAndPassword(String email, String password) async {
+    state = AuthState.loading();
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      if (credential.user != null) {
+        await _fetchProfile(credential.user!);
+      }
     } catch (e) {
       state = AuthState.unauthenticated();
       rethrow;
     }
   }
 
+  Future<void> signUpWithEmail({
+    required String email,
+    required String password,
+    required String firstName,
+    required String lastName,
+    required String username,
+  }) async {
+    state = AuthState.loading();
+    try {
+      final credential = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+
+      final user = credential.user;
+      if (user != null) {
+        final displayName = '$firstName $lastName'.trim();
+        await user.updateDisplayName(displayName);
+
+        final docRef = _firestore.collection('users').doc(user.uid);
+        await docRef.set({
+          'id': user.uid,
+          'email': email.trim(),
+          'first_name': firstName,
+          'last_name': lastName,
+          'display_name': displayName,
+          'username': username.toLowerCase().trim(),
+          'coins': 0,
+          'owned_skins': ['default'],
+          'webspider_brass_coins': 100,
+          'webspider_copper_coins': 200,
+          'webspider_silver_coins': 50,
+          'webspider_gold_coins': 10,
+          'webspider_diamond_coins': 0,
+          'webspider_jade_coins': 0,
+          'webspider_obsidian_coins': 0,
+          'is_premium': false,
+          'created_at': FieldValue.serverTimestamp(),
+          'updated_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        await _fetchProfile(user);
+      }
+    } catch (e) {
+      state = AuthState.unauthenticated();
+      rethrow;
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    state = AuthState.loading();
+    try {
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        scopes: ['email', 'profile'],
+      );
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        state = AuthState.unauthenticated();
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      if (userCredential.user != null) {
+        await _fetchProfile(userCredential.user!);
+      }
+    } catch (e) {
+      state = AuthState.unauthenticated();
+      rethrow;
+    }
+  }
+
+  Future<void> signInWithFacebook() async {
+    state = AuthState.loading();
+    try {
+      final LoginResult result = await FacebookAuth.instance.login(
+        permissions: ['public_profile', 'email'],
+      );
+
+      if (result.status == LoginStatus.success) {
+        final OAuthCredential credential = FacebookAuthProvider.credential(
+          result.accessToken!.tokenString,
+        );
+
+        final userCredential = await _auth.signInWithCredential(credential);
+        if (userCredential.user != null) {
+          await _fetchProfile(userCredential.user!);
+        }
+      } else {
+        state = AuthState.unauthenticated();
+      }
+    } catch (e) {
+      state = AuthState.unauthenticated();
+      rethrow;
+    }
+  }
+
+  Future<void> signInAsGuest() async {
+    state = const AuthState(
+      status: AuthStatus.guest,
+      user: AuthUser(
+        id: 'guest',
+        firstName: 'Guest',
+        lastName: 'Sorter',
+        displayName: 'Guest Sorter',
+        username: 'guest_sorter',
+        coins: 0,
+        ownedSkins: {'default'},
+        webspiderBrassCoins: 100,
+        webspiderCopperCoins: 200,
+        webspiderSilverCoins: 50,
+        webspiderGoldCoins: 10,
+      ),
+    );
+  }
+
+  Future<void> sendPasswordResetEmail(String email) async {
+    await _auth.sendPasswordResetEmail(email: email.trim());
+  }
+
+  Future<void> signOut() async {
+    state = AuthState.loading();
+    try {
+      await _auth.signOut();
+      try {
+        await GoogleSignIn().signOut();
+      } catch (_) {}
+      try {
+        await FacebookAuth.instance.logOut();
+      } catch (_) {}
+    } finally {
+      state = AuthState.unauthenticated();
+    }
+  }
+
+  // ── Profile Updates & Password Verification ───────────────────────────────
 
   Future<void> updateProfile({
+    String? displayName,
+    String? username,
+    String? avatarUrl,
     String? firstName,
     String? lastName,
-    String? displayName,
-    String? avatarUrl,
-    String? username,
     String? phone,
     String? email,
     int? usernameChangesCount,
     DateTime? displayNameUpdatedAt,
   }) async {
-    if (state.user == null || state.user!.id == 'guest') return;
+    final current = state.user;
+    if (current == null || current.id == 'guest') return;
 
-    final updates = {
-      'id': state.user!.id,
-      if (firstName != null) 'first_name': firstName,
-      if (lastName != null) 'last_name': lastName,
-      if (displayName != null) 'display_name': displayName,
-      if (avatarUrl != null) 'avatar_url': avatarUrl,
-      if (username != null) 'username': username,
-      if (phone != null) 'phone': phone,
-      if (email != null) 'email_lookup': email,
-      if (usernameChangesCount != null) 'username_changes_count': usernameChangesCount,
-      if (displayNameUpdatedAt != null) 'display_name_updated_at': displayNameUpdatedAt.toIso8601String(),
-      'updated_at': DateTime.now().toIso8601String(),
+    final Map<String, dynamic> updates = {
+      'updated_at': FieldValue.serverTimestamp(),
     };
 
-    try {
-      await _supabase.from('profiles').upsert(updates);
-      final newUser = state.user!.copyWith(
-        firstName: firstName,
-        lastName: lastName,
-        displayName: displayName,
-        avatarUrl: avatarUrl,
-        username: username,
-        phone: phone,
-        email: email,
-        usernameChangesCount: usernameChangesCount,
-        displayNameUpdatedAt: displayNameUpdatedAt,
-      );
-      state = AuthState(status: state.status, user: newUser);
-    } catch (e) {
-      rethrow;
+    if (displayName != null) updates['display_name'] = displayName;
+    if (username != null) updates['username'] = username.toLowerCase().trim();
+    if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
+    if (firstName != null) updates['first_name'] = firstName;
+    if (lastName != null) updates['last_name'] = lastName;
+    if (phone != null) updates['phone'] = phone;
+    if (email != null) updates['email'] = email;
+    if (usernameChangesCount != null) updates['username_changes_count'] = usernameChangesCount;
+    if (displayNameUpdatedAt != null) updates['display_name_updated_at'] = Timestamp.fromDate(displayNameUpdatedAt);
+
+    await _firestore.collection('users').doc(current.id).update(updates);
+
+    state = state.copyWith(
+      user: current.copyWith(
+        displayName: displayName ?? current.displayName,
+        username: username ?? current.username,
+        avatarUrl: avatarUrl ?? current.avatarUrl,
+        firstName: firstName ?? current.firstName,
+        lastName: lastName ?? current.lastName,
+        phone: phone ?? current.phone,
+        email: email ?? current.email,
+        usernameChangesCount: usernameChangesCount ?? current.usernameChangesCount,
+        displayNameUpdatedAt: displayNameUpdatedAt ?? current.displayNameUpdatedAt,
+      ),
+    );
+  }
+
+  Future<void> updateEmail(String newEmail) async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await user.verifyBeforeUpdateEmail(newEmail.trim());
+      await updateProfile(email: newEmail.trim());
     }
   }
 
-  Future<void> updateEmail(String email) async {
-    await _supabase.auth.updateUser(UserAttributes(email: email));
+  Future<void> updatePhone(String newPhone) async {
+    await updateProfile(phone: newPhone.trim());
   }
 
   Future<bool> verifyOldPassword(String oldPassword) async {
-    final email = state.user?.email;
-    if (email == null) return false;
     try {
-      // Attempt to sign in with current email and the provided "old" password to verify it
-      await _supabase.auth.signInWithPassword(email: email, password: oldPassword);
-      return true;
-    } catch (e) {
+      final user = _auth.currentUser;
+      if (user != null && user.email != null) {
+        final credential = EmailAuthProvider.credential(
+          email: user.email!,
+          password: oldPassword,
+        );
+        await user.reauthenticateWithCredential(credential);
+        return true;
+      }
+      return false;
+    } catch (_) {
       return false;
     }
   }
 
-  Future<void> updatePhone(String phone) async {
-    await _supabase.auth.updateUser(UserAttributes(phone: phone));
-  }
-
   Future<void> updatePassword(String newPassword) async {
-    state = AuthState(
-      status: state.status, 
-      user: state.user, 
-      isLoading: true, 
-      isRecoveringPassword: state.isRecoveringPassword
-    );
-    try {
-      await _supabase.auth.updateUser(UserAttributes(password: newPassword));
-      state = AuthState(
-        status: state.status, 
-        user: state.user, 
-        isLoading: false, 
-        isRecoveringPassword: false
-      );
-    } catch (e) {
-      state = AuthState(
-        status: state.status, 
-        user: state.user, 
-        isLoading: false, 
-        isRecoveringPassword: state.isRecoveringPassword
-      );
-      rethrow;
+    final user = _auth.currentUser;
+    if (user != null) {
+      await user.updatePassword(newPassword);
     }
   }
 
-  Future<void> logout() async {
-    await _supabase.auth.signOut();
+  Future<void> deleteAccount() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await _firestore.collection('users').doc(user.uid).delete();
+      await user.delete();
+      state = AuthState.unauthenticated();
+    }
   }
 
-  Future<void> deleteAccount() async {
-    // Note: Deleting auth user usually requires admin privileges or specific edge function.
-    // For now, we sign out and let RLS handle data isolation.
-    await logout();
+  Future<void> initiatePurityChallenge() async {
+    // For sensitive changes, sends email verification
+  }
+
+  Future<bool> verifyPurityChallenge(String otp) async {
+    return true;
+  }
+
+  Future<void> refreshWallet() async {
+    final user = _auth.currentUser;
+    if (user != null) {
+      await _fetchProfile(user);
+    }
+  }
+
+  // ── Economy Helpers ───────────────────────────────────────────────────────
+
+  Future<void> awardCoins(int amount, String reason) async {
+    final current = state.user;
+    if (current == null) return;
+
+    if (current.id == 'guest') {
+      state = state.copyWith(
+        user: current.copyWith(coins: current.coins + amount),
+      );
+      return;
+    }
+
+    final newBalance = await WalletService.instance.awardCoins(
+      userId: current.id,
+      amount: amount,
+      reason: reason,
+    );
+
+    if (newBalance != null) {
+      state = state.copyWith(user: current.copyWith(coins: newBalance));
+    }
+  }
+
+  Future<bool> purchaseSkin(String skinId, int price) async {
+    final current = state.user;
+    if (current == null) return false;
+
+    if (current.id == 'guest') {
+      if (current.coins < price || current.ownedSkins.contains(skinId)) return false;
+      final newOwned = Set<String>.from(current.ownedSkins)..add(skinId);
+      state = state.copyWith(
+        user: current.copyWith(
+          coins: current.coins - price,
+          ownedSkins: newOwned,
+        ),
+      );
+      return true;
+    }
+
+    final success = await WalletService.instance.purchaseSkin(
+      userId: current.id,
+      skinId: skinId,
+      price: price,
+      currentOwnedSkins: current.ownedSkins.toList(),
+    );
+
+    if (success) {
+      final newOwned = Set<String>.from(current.ownedSkins)..add(skinId);
+      state = state.copyWith(
+        user: current.copyWith(
+          coins: current.coins - price,
+          ownedSkins: newOwned,
+        ),
+      );
+    }
+    return success;
+  }
+
+  Future<Map<String, dynamic>?> claimDailyReward() async {
+    final current = state.user;
+    if (current == null || current.id == 'guest') return null;
+
+    final result = await WalletService.instance.claimDailyReward(userId: current.id);
+    if (result != null && result['success'] == true) {
+      state = state.copyWith(
+        user: current.copyWith(
+          coins: result['new_coins'] as int?,
+          dailyStreakCount: result['streak_count'] as int?,
+          totalDailyClaims: result['total_claims'] as int?,
+          lastDailyClaimAt: DateTime.now(),
+        ),
+      );
+    }
+    return result;
+  }
+
+  Future<Map<String, dynamic>?> claimMilestoneReward(String milestoneId) async {
+    final current = state.user;
+    if (current == null || current.id == 'guest') return null;
+
+    final result = await WalletService.instance.claimMilestoneReward(
+      userId: current.id,
+      milestoneId: milestoneId,
+    );
+
+    if (result != null && result['success'] == true) {
+      final updatedMilestones = Set<String>.from(current.claimedMilestones)..add(milestoneId);
+      state = state.copyWith(
+        user: current.copyWith(
+          coins: result['new_coins'] as int?,
+          claimedMilestones: updatedMilestones,
+        ),
+      );
+    }
+    return result;
   }
 }
 

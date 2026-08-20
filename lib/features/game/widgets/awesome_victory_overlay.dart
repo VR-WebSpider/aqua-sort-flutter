@@ -3,10 +3,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:aqua_sort/features/history/providers/history_provider.dart';
 import 'package:aqua_sort/features/game/providers/game_provider.dart';
-import 'package:aqua_sort/features/leaderboard/providers/leaderboard_provider.dart';
 import 'package:aqua_sort/core/services/wallet_service.dart';
 
 class AwesomeVictoryOverlay extends ConsumerStatefulWidget {
@@ -73,6 +71,8 @@ class _AwesomeVictoryOverlayState extends ConsumerState<AwesomeVictoryOverlay>
       _recorded = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         final game = ref.read(gameProvider);
+        if (game.isSplitScreen) return; // Skip history and coins for local split screen duel
+
         final p0 = game.playerStates[0]!;
         final level = ref.read(levelProvider).currentLevel;
 
@@ -96,11 +96,23 @@ class _AwesomeVictoryOverlayState extends ConsumerState<AwesomeVictoryOverlay>
       });
     }
 
+    final game = ref.watch(gameProvider);
+    final isSplit = game.isSplitScreen;
     final isVictory = widget.winnerIdx == 0;
-    final outcomeText = isVictory ? 'AWESOME!' : 'DEFEAT';
-    final ribbonColor = isVictory ? const Color(0xFFFF5252) : const Color(0xFF455A64);
-    final buttonColor = isVictory ? const Color(0xFFFFD100) : AppColors.cyanGlow;
-    final buttonTextColor = isVictory ? const Color(0xFF5D4037) : Colors.white;
+
+    String outcomeText;
+    Color ribbonColor;
+    if (isSplit) {
+      outcomeText = 'PLAYER ${widget.winnerIdx + 1} WINS!';
+      ribbonColor = const Color(0xFFFF5252);
+    } else {
+      outcomeText = isVictory ? 'VICTORY!' : 'DEFEAT';
+      ribbonColor = isVictory ? const Color(0xFFFF5252) : const Color(0xFF455A64);
+    }
+
+    final buttonColor = (isSplit || isVictory) ? const Color(0xFFFFD100) : AppColors.cyanGlow;
+    final buttonTextColor = (isSplit || isVictory) ? const Color(0xFF5D4037) : Colors.white;
+    final buttonLabel = isSplit ? 'LOBBY' : (isVictory ? 'NEXT' : 'RETRY');
 
     final levelProgress = ref.watch(levelProvider);
     final currentLevel = levelProgress.currentLevel;
@@ -202,33 +214,35 @@ class _AwesomeVictoryOverlayState extends ConsumerState<AwesomeVictoryOverlay>
             const SizedBox(height: 16),
 
             // Missions Container
-            Container(
-              width: 320,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1B2C3B).withOpacity(0.8),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white10),
-                boxShadow: [const BoxShadow(color: Colors.black54, blurRadius: 40, spreadRadius: 10)],
+            if (!isSplit) ...[
+              Container(
+                width: 320,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1B2C3B).withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: Colors.white10),
+                  boxShadow: [const BoxShadow(color: Colors.black54, blurRadius: 40, spreadRadius: 10)],
+                ),
+                child: Column(
+                  children: [
+                    _missionRow(
+                      label: "Reach level 4",
+                      current: currentLevel,
+                      target: 4,
+                    ),
+                    const Divider(color: Colors.white10, height: 32),
+                    _missionRow(
+                      label: "Reach level 10",
+                      current: currentLevel,
+                      target: 10,
+                    ),
+                  ],
+                ),
               ),
-              child: Column(
-                children: [
-                  _missionRow(
-                    label: "Reach level 4",
-                    current: currentLevel,
-                    target: 4,
-                  ),
-                  const Divider(color: Colors.white10, height: 32),
-                  _missionRow(
-                    label: "Reach level 10",
-                    current: currentLevel,
-                    target: 10,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 36),
+              const SizedBox(height: 36),
+            ] else
+              const SizedBox(height: 50),
 
             // NEXT Button
             GestureDetector(
@@ -239,13 +253,13 @@ class _AwesomeVictoryOverlayState extends ConsumerState<AwesomeVictoryOverlay>
                   color: buttonColor,
                   borderRadius: BorderRadius.circular(37),
                   boxShadow: [
-                    BoxShadow(color: isVictory ? Colors.orange.withOpacity(0.4) : AppColors.cyanGlow.withOpacity(0.4), 
+                    BoxShadow(color: (isSplit || isVictory) ? Colors.orange.withOpacity(0.4) : AppColors.cyanGlow.withOpacity(0.4), 
                       blurRadius: 15, offset: const Offset(0, 6)),
                   ],
                 ),
                 alignment: Alignment.center,
                 child: Text(
-                  isVictory ? 'NEXT' : 'RETRY',
+                  buttonLabel,
                   style: GoogleFonts.righteous(fontSize: 32, letterSpacing: 2, color: buttonTextColor),
                 ),
               ),

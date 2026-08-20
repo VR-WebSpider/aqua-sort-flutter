@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "983979028962",
+    "project_id": "webspider-studios-hub",
+    "storage_bucket": "webspider-studios-hub.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:983979028962:android:2130913c6788f08019c9bb",
+        "android_client_info": {
+          "package_name": "com.webspider.aquasort.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "983979028962-h21sg8a7m67t8macf3u463tcnsif7at0.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC-e_P8rK5BEC5w1KzwWExir3fDTO4atjU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "983979028962-h21sg8a7m67t8macf3u463tcnsif7at0.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

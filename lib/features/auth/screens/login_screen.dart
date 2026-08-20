@@ -5,7 +5,6 @@ import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:aqua_sort/features/auth/providers/auth_provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -195,7 +194,7 @@ class _LoginState extends ConsumerState<LoginScreen> {
                 outlined: true,
                 onTap: () async {
                   try {
-                    await ref.read(authProvider.notifier).signInWithSocial(OAuthProvider.google);
+                    await ref.read(authProvider.notifier).signInWithGoogle();
                     if (mounted) context.go('/lobby');
                   } catch (e) {
                     if (mounted) {
@@ -213,7 +212,7 @@ class _LoginState extends ConsumerState<LoginScreen> {
                 outlined: true,
                 onTap: () async {
                   try {
-                    await ref.read(authProvider.notifier).signInWithSocial(OAuthProvider.facebook);
+                    await ref.read(authProvider.notifier).signInWithFacebook();
                     if (mounted) context.go('/lobby');
                   } catch (e) {
                     if (mounted) {

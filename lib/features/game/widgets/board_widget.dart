@@ -9,7 +9,6 @@ import 'pouring_animation_overlay.dart';
 import 'interactive_tutorial_overlay.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
-import 'package:aqua_sort/core/services/economy_config.dart';
 import 'dart:async';
 
 
@@ -24,6 +23,7 @@ class BoardWidget extends ConsumerStatefulWidget {
 class _BoardWidgetState extends ConsumerState<BoardWidget> {
   Timer? _hintTimer;
   final List<GlobalKey> _tubeKeys = [];
+  bool _isFlipped = false;
 
   @override
   void initState() {
@@ -67,110 +67,119 @@ class _BoardWidgetState extends ConsumerState<BoardWidget> {
     // Ensure keys match tube count if difficulty changed
     _initKeys(state.tubes.length);
 
-    return Stack(
-      children: [
-        Column(
-          children: [
-            // ── HUD: Time Left | Moves Left | Undo ──────────────────────────
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  // Time Left pill
-                  _TimerPill(secondsLeft: state.secondsLeft, maxSeconds: state.maxSeconds),
-                  const SizedBox(width: 8),
-                  // Moves Left pill
-                  _MovesPill(movesLeft: state.movesLeft, maxMoves: state.maxMoves),
-                  const Spacer(),
-                  // Undo button with badge
-                  _UndoButton(
-                    freeUndosLeft: state.freeUndosLeft,
-                    canUndo: state.canUndo,
-                    onTap: () {
-                        ref.read(gameProvider.notifier).requestUndo(widget.playerIdx, context);
-                        _resetHintTimer();
-                      },
-                  ),
-                  if (!gameState.isSplitScreen && !gameState.isOnline) ...[
-                    const SizedBox(width: 8),
-                    _PauseButton(
-                      onTap: () => ref.read(gameProvider.notifier).pauseGame(context),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            
-            // Tubes Grid
-            Expanded(
-              child: Center(
-                child: Wrap(
-                  spacing: 16,
-                  runSpacing: 24,
-                  alignment: WrapAlignment.center,
-                  children: List.generate(state.tubes.length, (i) {
-                    final isSource = activePour?.fromIdx == i;
-                    final isDest   = activePour?.toIdx == i;
-                    
-                    return Opacity(
-                      opacity: (isSource || isDest) ? 0.0 : 1.0, 
-                      child: TubeWidget(
-                        key: _tubeKeys[i],
-                        tube: state.tubes[i],
-                        selected: state.selectedTube == i,
-                        onTap: () {
-                          // Interactive Tutorial Locking
-                          final level = ref.read(levelProvider).currentLevel;
-                          if (level <= 2) {
-                            final target = _getTutorialTarget(level, state.selectedTube);
-                            if (target != null && target != i) return; 
-                          }
-
-                          // Trigger shake if invalid pour
-                          final sel = state.selectedTube;
-                          if (sel != null && sel != i) {
-                            if (!GameEngine.canPour(state.tubes[sel], state.tubes[i])) {
-                              (_tubeKeys[sel].currentState as dynamic)?.shake();
-                            }
-                          }
-                          ref.read(gameProvider.notifier).selectTube(widget.playerIdx, i);
-                        _resetHintTimer();                        },
-                      ),
-                    );
-                  }),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            // Brand Watermark
-            Opacity(
-              opacity: 0.3,
-              child: Center(
-                child: Column(
+    return RotatedBox(
+      quarterTurns: _isFlipped ? 2 : 0,
+      child: Stack(
+        children: [
+          Column(
+            children: [
+              // ── HUD: Time Left | Moves Left | Undo ──────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
                   children: [
-                    Image.asset('assets/studio_logo_white.png', height: 40),
-                    const SizedBox(height: 2),
-                    Text('WebSpider Studios', 
-                      style: GoogleFonts.righteous(fontSize: 8, color: AppColors.tealAccent, letterSpacing: 1.5)),
+                    // Time Left pill
+                    _TimerPill(secondsLeft: state.secondsLeft, maxSeconds: state.maxSeconds),
+                    const SizedBox(width: 8),
+                    // Moves Left pill
+                    _MovesPill(movesLeft: state.movesLeft, maxMoves: state.maxMoves),
+                    const Spacer(),
+                    // Undo button with badge
+                    _UndoButton(
+                      freeUndosLeft: state.freeUndosLeft,
+                      canUndo: state.canUndo,
+                      onTap: () {
+                          ref.read(gameProvider.notifier).requestUndo(widget.playerIdx, context);
+                          _resetHintTimer();
+                        },
+                    ),
+                    if (gameState.isSplitScreen) ...[
+                      const SizedBox(width: 8),
+                      _FlipButton(
+                        isFlipped: _isFlipped,
+                        onTap: () => setState(() => _isFlipped = !_isFlipped),
+                      ),
+                    ] else if (!gameState.isOnline) ...[
+                      const SizedBox(width: 8),
+                      _PauseButton(
+                        onTap: () => ref.read(gameProvider.notifier).pauseGame(context),
+                      ),
+                    ],
                   ],
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-          ],
-        ),
+              
+              // Tubes Grid
+              Expanded(
+                child: Center(
+                  child: Wrap(
+                    spacing: 16,
+                    runSpacing: 24,
+                    alignment: WrapAlignment.center,
+                    children: List.generate(state.tubes.length, (i) {
+                      final isSource = activePour?.fromIdx == i;
+                      final isDest   = activePour?.toIdx == i;
+                      
+                      return Opacity(
+                        opacity: (isSource || isDest) ? 0.0 : 1.0, 
+                        child: TubeWidget(
+                          key: _tubeKeys[i],
+                          tube: state.tubes[i],
+                          selected: state.selectedTube == i,
+                          onTap: () {
+                            // Interactive Tutorial Locking
+                            final level = ref.read(levelProvider).currentLevel;
+                            if (level <= 2) {
+                              final target = _getTutorialTarget(level, state.selectedTube);
+                              if (target != null && target != i) return; 
+                            }
 
-        // ── ANIMATION OVERLAY ──────────────────────────────────────────────────
-        if (activePour != null)
-           _buildPouringOverlay(activePour),
-
-        // ── INTERACTIVE TUTORIAL ────────────────────────────────────────────────
-        if (state.tubes.isNotEmpty)
-          InteractiveTutorialOverlay(
-            tubePositions: _getVisibleTubePositions(),
-            onAllowedTap: (idx) => ref.read(gameProvider.notifier).selectTube(widget.playerIdx, idx),
+                            // Trigger shake if invalid pour
+                            final sel = state.selectedTube;
+                            if (sel != null && sel != i) {
+                              if (!GameEngine.canPour(state.tubes[sel], state.tubes[i])) {
+                                (_tubeKeys[sel].currentState as dynamic)?.shake();
+                              }
+                            }
+                            ref.read(gameProvider.notifier).selectTube(widget.playerIdx, i);
+                          _resetHintTimer();                        },
+                        ),
+                      );
+                    }),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              // Brand Watermark
+              Opacity(
+                opacity: 0.3,
+                child: Center(
+                  child: Column(
+                    children: [
+                      Image.asset('assets/studio_logo_white.png', height: 40),
+                      const SizedBox(height: 2),
+                      Text('WebSpider Studios', 
+                        style: GoogleFonts.righteous(fontSize: 8, color: AppColors.tealAccent, letterSpacing: 1.5)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
-      ],
+
+          // ── ANIMATION OVERLAY ──────────────────────────────────────────────────
+          if (activePour != null)
+             _buildPouringOverlay(activePour),
+
+          // ── INTERACTIVE TUTORIAL ────────────────────────────────────────────────
+          if (state.tubes.isNotEmpty)
+            InteractiveTutorialOverlay(
+              tubePositions: _getVisibleTubePositions(),
+              onAllowedTap: (idx) => ref.read(gameProvider.notifier).selectTube(widget.playerIdx, idx),
+            ),
+        ],
+      ),
     );
   }
 
@@ -412,6 +421,43 @@ class _PauseButton extends StatelessWidget {
               Icons.pause_rounded,
               size: 16,
               color: AppColors.tealAccent,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _FlipButton extends StatelessWidget {
+  final bool isFlipped;
+  final VoidCallback onTap;
+
+  const _FlipButton({
+    required this.isFlipped,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isFlipped ? AppColors.tealAccent : Colors.white10,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.screen_rotation_rounded,
+              size: 16,
+              color: isFlipped ? AppColors.tealAccent : Colors.white70,
             ),
           ],
         ),
