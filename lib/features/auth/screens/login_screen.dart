@@ -86,7 +86,38 @@ class _LoginState extends ConsumerState<LoginScreen> {
                   shadows: [const Shadow(color: AppColors.cyanGlow, blurRadius: 22)])),
               const SizedBox(height: 4),
               Text('Welcome back, Sorter', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary)),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+
+              // ── Google One-Tap Sign In Hero ──
+              GlowButton(
+                label: 'Sign In with Google',
+                icon: Icons.g_mobiledata,
+                loading: ref.watch(authProvider).isLoading,
+                onTap: () async {
+                  try {
+                    await ref.read(authProvider.notifier).signInWithGoogle();
+                    if (mounted) context.go('/lobby');
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Google Sign-In failed: ${e.toString()}'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Colors.white10)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('or continue with email / phone', style: GoogleFonts.outfit(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 12)),
+                  ),
+                  const Expanded(child: Divider(color: Colors.white10)),
+                ],
+              ),
+              const SizedBox(height: 20),
 
               // Tab Selector
               Row(
@@ -176,35 +207,6 @@ class _LoginState extends ConsumerState<LoginScreen> {
                   }
                 }
               }),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Expanded(child: Divider(color: Colors.white10)),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Text('or', style: GoogleFonts.outfit(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 13)),
-                  ),
-                  const Expanded(child: Divider(color: Colors.white10)),
-                ],
-              ),
-              const SizedBox(height: 16),
-              GlowButton(
-                label: 'Continue with Google',
-                icon: Icons.g_mobiledata,
-                outlined: true,
-                onTap: () async {
-                  try {
-                    await ref.read(authProvider.notifier).signInWithGoogle();
-                    if (mounted) context.go('/lobby');
-                  } catch (e) {
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Google Sign-In failed: ${e.toString()}'), backgroundColor: Colors.redAccent),
-                      );
-                    }
-                  }
-                },
-              ),
               const SizedBox(height: 12),
               GlowButton(
                 label: 'Continue with Facebook',

@@ -122,11 +122,23 @@ class _SplashState extends ConsumerState<SplashScreen> with TickerProviderStateM
               padding: EdgeInsets.symmetric(horizontal: size.width * 0.1),
               child: Column(children: [
                 GlowButton(
-                  label: 'Secure Login', 
-                  icon: Icons.lock_outline,
-                  onTap: () => context.go('/login'),
+                  label: 'Sign in with Google', 
+                  icon: Icons.g_mobiledata,
+                  loading: ref.watch(authProvider).isLoading,
+                  onTap: () async {
+                    try {
+                      await ref.read(authProvider.notifier).signInWithGoogle();
+                      if (context.mounted) {
+                        context.go('/lobby');
+                      }
+                    } catch (e) {
+                      if (context.mounted) {
+                        AquaErrorDialog.show(context, e);
+                      }
+                    }
+                  },
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 12),
                 GlowButton(
                   label: 'Play as Guest', 
                   outlined: true,
@@ -142,6 +154,22 @@ class _SplashState extends ConsumerState<SplashScreen> with TickerProviderStateM
                       }
                     }
                   },
+                ),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () => context.go('/login'),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6.0),
+                    child: Text(
+                      'Email / Password & Other Sign-In Options',
+                      style: GoogleFonts.outfit(
+                        color: AppColors.cyanGlow,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
                 ),
               ]),
             ),

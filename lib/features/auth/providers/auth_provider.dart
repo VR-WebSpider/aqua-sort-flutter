@@ -192,18 +192,41 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void _init() {
     debugPrint('AUTH_NOTIFIER: Initializing Firebase Auth listener...');
     
-    _auth.authStateChanges().listen((User? user) {
+    _auth.authStateChanges().listen((User? user) async {
       if (user != null) {
         debugPrint('AUTH_NOTIFIER: User detected -> ${user.uid}');
-        _fetchProfile(user);
+        await _fetchProfile(user);
         PushNotificationService.setUserId(user.uid);
       } else {
-        debugPrint('AUTH_NOTIFIER: User signed out');
+        debugPrint('AUTH_NOTIFIER: User signed out, attempting silent Google sign-in...');
+        try {
+          final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+          final GoogleSignInAccount? googleUser = await googleSignIn.signInSilently();
+          if (googleUser != null) {
+            final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+            final AuthCredential credential = GoogleAuthProvider.credential(
+              accessToken: googleAuth.accessToken,
+              idToken: googleAuth.idToken,
+            );
+            final userCredential = await _auth.signInWithCredential(credential);
+            if (userCredential.user != null) {
+              await _fetchProfile(userCredential.user!);
+              PushNotificationService.setUserId(userCredential.user!.uid);
+              return;
+            }
+          }
+        } catch (e) {
+          debugPrint('Silent Google Sign-In error: $e');
+        }
         state = AuthState.unauthenticated();
         PushNotificationService.removeUserId();
       }
     });
   }
+
+  Future<void> login(String identifier, String password) => signInWithEmailAndPassword(identifier, password);
+  Future<void> setGuest() => signInAsGuest();
+  Future<void> logout() => signOut();
 
   Future<void> _fetchProfile(User user) async {
     try {

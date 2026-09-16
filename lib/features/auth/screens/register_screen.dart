@@ -181,7 +181,38 @@ CONTACT: webspiderstudios@gmail.com
                   shadows: [const Shadow(color: AppColors.cyanGlow, blurRadius: 22)])),
               const SizedBox(height: 4),
               Text('Join the Aqua Sort community', style: GoogleFonts.outfit(fontSize: 13, color: AppColors.textSecondary)),
-              const SizedBox(height: 32),
+              const SizedBox(height: 20),
+
+              // ── Google One-Tap Sign Up Hero ──
+              GlowButton(
+                label: 'Sign Up with Google',
+                icon: Icons.g_mobiledata,
+                loading: ref.watch(authProvider).isLoading,
+                onTap: () async {
+                  try {
+                    await ref.read(authProvider.notifier).signInWithGoogle();
+                    if (mounted) context.go('/lobby');
+                  } catch (e) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Google Sign-Up failed: ${e.toString()}'), backgroundColor: Colors.redAccent),
+                      );
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  const Expanded(child: Divider(color: Colors.white10)),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Text('or create with email', style: GoogleFonts.outfit(color: AppColors.textSecondary.withOpacity(0.5), fontSize: 12)),
+                  ),
+                  const Expanded(child: Divider(color: Colors.white10)),
+                ],
+              ),
+              const SizedBox(height: 20),
 
               // ── Fields ──────────────────────────────────────────────────
               AquaField(label: 'Email', hint: 'you@example.com',

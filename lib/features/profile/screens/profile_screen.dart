@@ -103,8 +103,27 @@ class ProfileScreen extends ConsumerWidget {
                         _profileItem(Icons.policy_outlined, 'Privacy Policy', onTap: () => _showPrivacy(context)),
                         _profileItem(Icons.delete_forever_outlined, 'Reset Progress & Data', isDestructive: true, onTap: () => _showResetConfirm(context, ref)),
                         const SizedBox(height: 24),
+                        if (auth.status == AuthStatus.guest) ...[
+                          GlowButton(
+                            label: 'Connect with Google',
+                            icon: Icons.g_mobiledata,
+                            loading: auth.isLoading,
+                            onTap: () async {
+                              try {
+                                await ref.read(authProvider.notifier).signInWithGoogle();
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text('Google Sign-In failed: $e'), backgroundColor: Colors.redAccent),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 12),
+                        ],
                         GlowButton(
-                          label: auth.status == AuthStatus.guest ? 'Log In / Sign Up' : 'Log Out',
+                          label: auth.status == AuthStatus.guest ? 'Other Log In Options' : 'Log Out',
                           outlined: true,
                           onTap: () {
                             ref.read(authProvider.notifier).logout();
@@ -222,10 +241,94 @@ class ProfileScreen extends ConsumerWidget {
       builder: (context, ref, child) {
         final settings = ref.watch(settingsProvider);
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Text(
+              'AUDIO & HAPTICS',
+              style: GoogleFonts.righteous(
+                color: AppColors.tealAccent,
+                fontSize: 12,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
             _settingToggle('Background Music', settings.musicEnabled, () => ref.read(settingsProvider.notifier).toggleMusic()),
             _settingToggle('Sound Effects', settings.sfxEnabled, () => ref.read(settingsProvider.notifier).toggleSfx()),
-            _settingToggle('Haptic Feedback', settings.hapticsEnabled, () => ref.read(settingsProvider.notifier).toggleHaptics()),
+            _settingToggle('Haptic Feedback (Tap Vibrations)', settings.hapticsEnabled, () => ref.read(settingsProvider.notifier).toggleHaptics()),
+            const Divider(color: Colors.white10, height: 32),
+            Row(
+              children: [
+                const Icon(Icons.touch_app, color: AppColors.cyanGlow, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  'TOUCH SENSITIVITY & HITBOX',
+                  style: GoogleFonts.righteous(
+                    color: AppColors.cyanGlow,
+                    fontSize: 12,
+                    letterSpacing: 1.5,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Adjust tube touch recognition area according to your device screen and screen protector:',
+              style: GoogleFonts.outfit(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: TouchSensitivity.values.map((s) {
+                final isSelected = settings.touchSensitivity == s;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => ref.read(settingsProvider.notifier).setTouchSensitivity(s),
+                    child: Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isSelected ? AppColors.cyanGlow.withOpacity(0.2) : Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isSelected ? AppColors.cyanGlow : Colors.white10,
+                          width: isSelected ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          s.name.toUpperCase(),
+                          style: GoogleFonts.righteous(
+                            color: isSelected ? Colors.white : Colors.white60,
+                            fontSize: 12,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.04),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: AppColors.tealAccent, size: 16),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      settings.touchSensitivity.description,
+                      style: GoogleFonts.outfit(color: AppColors.tealAccent, fontSize: 11.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ],
         );
       },

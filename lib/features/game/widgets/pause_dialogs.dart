@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
 import 'package:aqua_sort/features/auth/widgets/aqua_widgets.dart';
+import 'package:aqua_sort/features/profile/providers/settings_provider.dart';
 
 enum PauseGateResult { usedGold, usedBrass, watchedAd, goPremium, cancelled }
 
-class PauseDialog extends StatelessWidget {
+class PauseDialog extends ConsumerWidget {
   final int pausesUsed;
   final bool isPremium;
 
@@ -16,13 +18,15 @@ class PauseDialog extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24),
       child: Center(
         child: Container(
-          padding: const EdgeInsets.all(28),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: AppColors.deepNavy.withOpacity(0.95),
             borderRadius: BorderRadius.circular(28),
@@ -37,25 +41,87 @@ class PauseDialog extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.pause_circle_outline, color: AppColors.tealAccent, size: 64),
-              const SizedBox(height: 16),
+              const Icon(Icons.pause_circle_outline, color: AppColors.tealAccent, size: 52),
+              const SizedBox(height: 12),
               Text(
                 'GAME PAUSED',
                 style: GoogleFonts.righteous(
-                  fontSize: 24,
+                  fontSize: 22,
                   color: Colors.white,
                   letterSpacing: 2.0,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Text(
                 isPremium ? 'Premium: Unlimited Pauses' : 'Free Pauses Used: $pausesUsed/2',
                 style: GoogleFonts.outfit(
-                  fontSize: 13,
+                  fontSize: 12,
                   color: AppColors.textSecondary,
                 ),
               ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 18),
+              
+              // ── Touch Sensitivity Quick Adjuster ───────────────────────────
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.04),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.touch_app, color: AppColors.cyanGlow, size: 16),
+                        const SizedBox(width: 6),
+                        Text(
+                          'TOUCH SENSITIVITY',
+                          style: GoogleFonts.righteous(
+                            color: AppColors.cyanGlow,
+                            fontSize: 11,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: TouchSensitivity.values.map((s) {
+                        final isSelected = settings.touchSensitivity == s;
+                        return Expanded(
+                          child: GestureDetector(
+                            onTap: () => ref.read(settingsProvider.notifier).setTouchSensitivity(s),
+                            child: Container(
+                              margin: const EdgeInsets.symmetric(horizontal: 2),
+                              padding: const EdgeInsets.symmetric(vertical: 6),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.cyanGlow.withOpacity(0.2) : Colors.transparent,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.cyanGlow : Colors.white10,
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  s.name.toUpperCase(),
+                                  style: GoogleFonts.righteous(
+                                    color: isSelected ? Colors.white : Colors.white60,
+                                    fontSize: 10.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
               GlowButton(
                 label: 'RESUME',
                 icon: Icons.play_arrow_rounded,

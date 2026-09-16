@@ -5,7 +5,9 @@ import 'package:aqua_sort/features/game/widgets/liquid_painter.dart';
 import 'package:aqua_sort/core/services/audio_service.dart';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:aqua_sort/features/lobby/providers/level_provider.dart';
+import 'package:aqua_sort/features/profile/providers/settings_provider.dart';
 import 'package:aqua_sort/features/profile/models/skin_catalogue.dart';
 
 /// Draws a single test tube with stacked colored water layers and realistic wobble effects.
@@ -152,23 +154,35 @@ class _TubeWidgetState extends ConsumerState<TubeWidget> with TickerProviderStat
         } else {
             colors.add(kTubeColors[rawColors[i] % kTubeColors.length]);
         }
-    }
+    final sensitivity = ref.watch(settingsProvider.select((s) => s.touchSensitivity));
+    final hapticsEnabled = ref.watch(settingsProvider.select((s) => s.hapticsEnabled));
 
     return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTapDown: (_) {
+        if (hapticsEnabled) {
+          HapticFeedback.selectionClick();
+        }
+      },
       onTap: widget.onTap,
-      child: AnimatedBuilder(
-        animation: Listenable.merge([_lift, _wobble, _shake, _idleCtrl, _capCtrl]),
-        builder: (_, __) {
-          // Add visual repulsion high-frequency vibration jitter if receiving liquid
-          double jitterX = 0.0;
-          double jitterY = 0.0;
-          if (widget.isReceiving) {
-            final double t = DateTime.now().millisecondsSinceEpoch / 18.0;
-            jitterX = math.sin(t) * 0.8;
-            jitterY = math.cos(t * 1.35) * 0.6;
-          }
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: sensitivity.horizontalPadding,
+          vertical: sensitivity.verticalPadding,
+        ),
+        child: AnimatedBuilder(
+          animation: Listenable.merge([_lift, _wobble, _shake, _idleCtrl, _capCtrl]),
+          builder: (_, __) {
+            // Add visual repulsion high-frequency vibration jitter if receiving liquid
+            double jitterX = 0.0;
+            double jitterY = 0.0;
+            if (widget.isReceiving) {
+              final double t = DateTime.now().millisecondsSinceEpoch / 18.0;
+              jitterX = math.sin(t) * 0.8;
+              jitterY = math.cos(t * 1.35) * 0.6;
+            }
 
-          return Transform.translate(
+            return Transform.translate(
             offset: Offset(_shake.value * 6 + jitterX, _lift.value + jitterY),
             child: Stack(
               clipBehavior: Clip.none,
