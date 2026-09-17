@@ -71,45 +71,40 @@ class LiquidPainter extends CustomPainter {
       final double topY = h - (seg.endIdx * layerHeight) - currentLayerHeight;
       final double bottomY = h - (seg.startIdx * layerHeight);
 
-      // Specular 3D cylinder gradient
+      // Specular 3D cylinder gradient with vibrant aquatic illumination
       final Paint paint = Paint()
         ..shader = LinearGradient(
           colors: [
-            Color.lerp(color, Colors.black, 0.12)!, 
+            Color.lerp(color, Colors.black, 0.14)!, 
             color,                                   
-            Color.lerp(color, Colors.white, 0.28)!,  
+            Color.lerp(color, Colors.white, 0.35)!,  
             color,                                   
-            Color.lerp(color, Colors.black, 0.08)!, 
+            Color.lerp(color, Colors.black, 0.10)!, 
           ],
-          stops: const [0.0, 0.25, 0.35, 0.65, 1.0],
+          stops: const [0.0, 0.22, 0.36, 0.68, 1.0],
           begin: Alignment.centerLeft,
           end: Alignment.centerRight,
         ).createShader(Rect.fromLTRB(-w / 2, 0, w / 2, h))
         ..style = PaintingStyle.fill;
 
-      // Note: We do NOT rotate the canvas. Drawing directly in the tube's local vertical
-      // space and tilting the surface lines mathematically using `- math.tan(tilt) * x`
-      // guarantees that the left/right edges of the surface always align perfectly 
-      // with the actual tube walls (-w/2 and w/2). This prevents the meniscus from
-      // clipping away near the bottom of the tube (eliminating the "tilted paper triangle" bug).
       canvas.save();
       canvas.translate(w / 2, 0);
 
       final Path layerPath = Path();
-      const int steps = 30;
+      const int steps = 36;
       final double stepWidth = w / steps;
 
-      // 1. Top boundary (left to right)
+      // 1. Top boundary with dynamic dual-harmonic wave meniscus
       if (isTop) {
         for (int j = 0; j <= steps; j++) {
           final double x = -w / 2 + (j * stepWidth);
           final double normX = x / (w / 2);
           
-          final double meniscusY = -3.2 * math.pow(normX, 4);
-          final double idleWave = math.sin(x * waveFreq + timePhase) * 1.5;
-          final double wobbleWave = math.sin(x * waveFreq * 1.2 + wobble * 5.0) * 4.0 * wobble;
+          final double meniscusY = -3.5 * math.pow(normX, 4);
+          final double idleWave = math.sin(x * waveFreq + timePhase) * 1.6 + math.cos(x * waveFreq * 2.0 - timePhase * 1.5) * 0.4;
+          final double wobbleWave = math.sin(x * waveFreq * 1.2 + wobble * 5.0) * 4.5 * wobble;
           final double ripple = isReceiving
-              ? math.sin(x.abs() * 0.45 - timePhase * 3.5) * 3.5 / (1.0 + x.abs() * 0.08)
+              ? math.sin(x.abs() * 0.50 - timePhase * 4.0) * 4.0 / (1.0 + x.abs() * 0.08)
               : 0.0;
 
           final double y = topY - math.tan(tilt) * x + idleWave + wobbleWave + meniscusY + ripple;
@@ -125,7 +120,7 @@ class LiquidPainter extends CustomPainter {
         layerPath.lineTo(w / 2, topY - math.tan(tilt) * (w / 2));
       }
 
-      // 2. Bottom boundary (right to left)
+      // 2. Bottom boundary
       if (seg.startIdx == 0) {
         layerPath.lineTo(w / 2, h + 20);
         layerPath.lineTo(-w / 2, h + 20);
@@ -137,22 +132,22 @@ class LiquidPainter extends CustomPainter {
       layerPath.close();
       canvas.drawPath(layerPath, paint);
 
-      // 3. Glowing top surface outline (only for the top layer)
+      // 3. Glowing top surface shimmer outline
       if (isTop) {
         final Paint surfacePaint = Paint()
-          ..color = Colors.white.withOpacity(0.35)
+          ..color = Colors.white.withOpacity(0.42)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.6;
+          ..strokeWidth = 1.8;
 
         final Path surfacePath = Path();
         for (int j = 0; j <= steps; j++) {
           final double x = -w / 2 + (j * stepWidth);
           final double normX = x / (w / 2);
-          final double meniscusY = -3.2 * math.pow(normX, 4);
-          final double idleWave = math.sin(x * waveFreq + timePhase) * 1.5;
-          final double wobbleWave = math.sin(x * waveFreq * 1.2 + wobble * 5.0) * 4.0 * wobble;
+          final double meniscusY = -3.5 * math.pow(normX, 4);
+          final double idleWave = math.sin(x * waveFreq + timePhase) * 1.6 + math.cos(x * waveFreq * 2.0 - timePhase * 1.5) * 0.4;
+          final double wobbleWave = math.sin(x * waveFreq * 1.2 + wobble * 5.0) * 4.5 * wobble;
           final double ripple = isReceiving
-              ? math.sin(x.abs() * 0.45 - timePhase * 3.5) * 3.5 / (1.0 + x.abs() * 0.08)
+              ? math.sin(x.abs() * 0.50 - timePhase * 4.0) * 4.0 / (1.0 + x.abs() * 0.08)
               : 0.0;
 
           final double y = topY - math.tan(tilt) * x + idleWave + wobbleWave + meniscusY + ripple;
@@ -165,33 +160,69 @@ class LiquidPainter extends CustomPainter {
         }
         canvas.drawPath(surfacePath, surfacePaint);
 
-        // 4. Splash particles at impact point
+        // 4. Splash & Foam particles at fluid impact point
         if (isReceiving) {
-          final math.Random splashRand = math.Random(DateTime.now().millisecondsSinceEpoch ~/ 90);
+          final math.Random splashRand = math.Random(DateTime.now().millisecondsSinceEpoch ~/ 80);
           final Paint bubblePaint = Paint()..style = PaintingStyle.fill;
 
-          for (int j = 0; j < 4; j++) {
-            final double sx = (splashRand.nextDouble() - 0.5) * 12.0;
-            final double sy = topY - splashRand.nextDouble() * 10.0;
-            final double size = splashRand.nextDouble() * 2.0 + 0.8;
+          for (int j = 0; j < 6; j++) {
+            final double sx = (splashRand.nextDouble() - 0.5) * 14.0;
+            final double sy = topY - splashRand.nextDouble() * 12.0;
+            final double bSize = splashRand.nextDouble() * 2.4 + 0.8;
 
-            bubblePaint.color = Colors.white.withOpacity(splashRand.nextDouble() * 0.6 + 0.4);
-            canvas.drawCircle(Offset(sx, sy), size, bubblePaint);
+            bubblePaint.color = Colors.white.withOpacity(splashRand.nextDouble() * 0.65 + 0.35);
+            canvas.drawCircle(Offset(sx, sy), bSize, bubblePaint);
 
-            final double dx = (splashRand.nextDouble() - 0.5) * 18.0;
-            final double dy = topY - splashRand.nextDouble() * 8.0;
-            canvas.drawCircle(Offset(dx, dy), size * 0.6, Paint()
-              ..color = color.withOpacity(splashRand.nextDouble() * 0.5 + 0.3)
+            final double dx = (splashRand.nextDouble() - 0.5) * 20.0;
+            final double dy = topY - splashRand.nextDouble() * 10.0;
+            canvas.drawCircle(Offset(dx, dy), bSize * 0.6, Paint()
+              ..color = color.withOpacity(splashRand.nextDouble() * 0.6 + 0.4)
               ..style = PaintingStyle.fill);
           }
         }
       }
 
+      // 5. Rising buoyant micro-bubbles inside liquid columns
+      _drawRisingBubbles(canvas, color, topY, bottomY, w, timePhase);
+
+      // 6. Ambient shimmer sparkles
       _drawSparkles(canvas, color, topY, bottomY, w, timePhase);
 
       canvas.restore();
     }
+  }
 
+  void _drawRisingBubbles(Canvas canvas, Color color, double topY, double bottomY, double w, double timePhase) {
+    final double height = bottomY - topY;
+    if (height <= 8) return;
+
+    final math.Random rand = math.Random(color.value ^ 0x3F);
+    const int bubbleCount = 4;
+
+    final Paint bubbleGlow = Paint()
+      ..color = Colors.white.withOpacity(0.20)
+      ..style = PaintingStyle.fill;
+    
+    final Paint bubbleBorder = Paint()
+      ..color = Colors.white.withOpacity(0.40)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6;
+
+    for (int i = 0; i < bubbleCount; i++) {
+      final double seed = rand.nextDouble();
+      final double speed = 0.8 + seed * 1.2;
+      final double cycleProgress = ((timePhase * speed / (2 * math.pi)) + (i * 0.25)) % 1.0;
+      
+      final double y = bottomY - (cycleProgress * height);
+      final double sway = math.sin(timePhase * 2.0 + (i * 1.8)) * 3.0;
+      final double x = (-w / 2 + 6) + (seed * (w - 12)) + sway;
+      final double radius = 0.9 + seed * 1.3;
+
+      if (y >= topY + 2 && y <= bottomY - 2) {
+        canvas.drawCircle(Offset(x, y), radius, bubbleGlow);
+        canvas.drawCircle(Offset(x, y), radius, bubbleBorder);
+      }
+    }
   }
 
   void _drawSparkles(Canvas canvas, Color color, double topY, double bottomY, double w, double timePhase) {

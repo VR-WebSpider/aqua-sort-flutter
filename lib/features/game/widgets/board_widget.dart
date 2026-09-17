@@ -9,6 +9,7 @@ import 'pouring_animation_overlay.dart';
 import 'interactive_tutorial_overlay.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:aqua_sort/core/theme/app_colors.dart';
+import 'package:aqua_sort/core/services/audio_service.dart';
 import 'dart:async';
 
 
@@ -89,6 +90,7 @@ class _BoardWidgetState extends ConsumerState<BoardWidget> {
                       freeUndosLeft: state.freeUndosLeft,
                       canUndo: state.canUndo,
                       onTap: () {
+                          AudioService.instance.playUndoWhoosh();
                           ref.read(gameProvider.notifier).requestUndo(widget.playerIdx, context);
                           _resetHintTimer();
                         },

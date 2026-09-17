@@ -118,6 +118,7 @@ class _TubeWidgetState extends ConsumerState<TubeWidget> with TickerProviderStat
     Future.delayed(const Duration(milliseconds: 250), () {
       if (mounted && widget.tube.isSolved && !widget.tube.isEmpty) {
         AudioService.instance.playLidClosing();
+        AudioService.instance.playMiniCelebration();
       }
     });
 

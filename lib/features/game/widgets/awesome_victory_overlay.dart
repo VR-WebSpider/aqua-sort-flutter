@@ -7,6 +7,8 @@ import 'package:aqua_sort/features/history/providers/history_provider.dart';
 import 'package:aqua_sort/features/game/providers/game_provider.dart';
 import 'package:aqua_sort/core/services/wallet_service.dart';
 
+import 'package:aqua_sort/core/services/audio_service.dart';
+
 class AwesomeVictoryOverlay extends ConsumerStatefulWidget {
   final VoidCallback onNext;
   final int winnerIdx;
@@ -38,6 +40,7 @@ class _AwesomeVictoryOverlayState extends ConsumerState<AwesomeVictoryOverlay>
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _ribbonController, curve: Curves.elasticOut));
     _ribbonController.forward();
+    AudioService.instance.playWin();
   }
 
   @override
@@ -56,8 +59,16 @@ class _AwesomeVictoryOverlayState extends ConsumerState<AwesomeVictoryOverlay>
     _coinCounterAnim = Tween<double>(begin: 0, end: earned.toDouble())
         .animate(CurvedAnimation(parent: _coinCounterController!, curve: Curves.easeOutCubic));
 
+    int lastTick = 0;
     _coinCounterAnim!.addListener(() {
-      setState(() => _displayedCoins = _coinCounterAnim!.value.round());
+      final current = _coinCounterAnim!.value.round();
+      if (current != lastTick) {
+        lastTick = current;
+        if (current % 2 == 0) {
+          AudioService.instance.playCoinReward();
+        }
+      }
+      setState(() => _displayedCoins = current);
     });
 
     Future.delayed(const Duration(milliseconds: 300), () {

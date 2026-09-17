@@ -13,9 +13,14 @@ class AudioService {
   final AudioPlayer _bgmPlayer = AudioPlayer();
 
   // Local asset paths for instant loading and offline support
-  static const String _pourFile = 'audio/pouring.mp3';
-  static const String _winFile  = 'audio/celebration.mp3';
+  static const String _pourFile = 'audio/tube_pour_liquid.wav';
+  static const String _winFile  = 'audio/victory_fanfare_orchestral.wav';
   static const String _bgmFile  = 'audio/Tides_in_the_Glass.mp3';
+  static const String _tapFile  = 'audio/water_drop_tap.wav';
+  static const String _corkFile = 'audio/cork_snap_lock.wav';
+  static const String _chimeFile= 'audio/solved_chime_sparkle.wav';
+  static const String _coinFile = 'audio/coin_pickup.wav';
+  static const String _undoFile = 'audio/undo_rewind_whoosh.wav';
 
   int _activeSfxCount = 0;
 
@@ -89,6 +94,19 @@ class AudioService {
   }
 
   Future<void> playTubeClick() async {
+    if (await _isSfxEnabled()) {
+      try {
+        final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+        await player.setVolume(0.50);
+        await player.play(AssetSource(_tapFile));
+        Future.delayed(const Duration(milliseconds: 300), () async {
+          try {
+            await player.stop();
+            await player.dispose();
+          } catch (_) {}
+        });
+      } catch (_) {}
+    }
     if (await _isHapticsEnabled()) {
       HapticFeedback.lightImpact();
     }
@@ -97,8 +115,8 @@ class AudioService {
   Future<AudioPlayer?> playPour() async {
     if (!(await _isSfxEnabled())) return null;
     try {
-      final player = AudioPlayer();
-      await player.setVolume(1.0);
+      final player = AudioPlayer()..setReleaseMode(ReleaseMode.loop);
+      await player.setVolume(0.85);
       await player.play(AssetSource(_pourFile));
       if (await _isHapticsEnabled()) {
         HapticFeedback.lightImpact();
@@ -124,29 +142,9 @@ class AudioService {
     try {
       final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
       await player.setVolume(0.95);
-      await player.play(AssetSource('audio/mini_celebration.wav'));
+      await player.play(AssetSource(_chimeFile));
       
-      Future.delayed(const Duration(milliseconds: 1000), () async {
-        try {
-          await player.stop();
-          await player.dispose();
-        } catch (_) {}
-          await _unduckBgm();
-      });
-    } catch (e) {
-      await _unduckBgm();
-    }
-  }
-
-  Future<void> playLidClosing() async {
-    if (!(await _isSfxEnabled())) return;
-    await _duckBgm();
-    try {
-      final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
-      await player.setVolume(0.85);
-      await player.play(AssetSource('audio/Lid Closing SFX.mp3'));
-      
-      Future.delayed(const Duration(milliseconds: 1000), () async {
+      Future.delayed(const Duration(milliseconds: 1300), () async {
         try {
           await player.stop();
           await player.dispose();
@@ -158,21 +156,75 @@ class AudioService {
     }
   }
 
+  Future<void> playLidClosing() async {
+    if (!(await _isSfxEnabled())) return;
+    await _duckBgm();
+    try {
+      final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+      await player.setVolume(0.90);
+      await player.play(AssetSource(_corkFile));
+      
+      Future.delayed(const Duration(milliseconds: 600), () async {
+        try {
+          await player.stop();
+          await player.dispose();
+        } catch (_) {}
+        await _unduckBgm();
+      });
+    } catch (e) {
+      await _unduckBgm();
+    }
+  }
+
+  Future<void> playCoinReward() async {
+    if (!(await _isSfxEnabled())) return;
+    try {
+      final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+      await player.setVolume(0.80);
+      await player.play(AssetSource(_coinFile));
+      if (await _isHapticsEnabled()) {
+        HapticFeedback.mediumImpact();
+      }
+      Future.delayed(const Duration(milliseconds: 600), () async {
+        try {
+          await player.stop();
+          await player.dispose();
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
+  Future<void> playUndoWhoosh() async {
+    if (!(await _isSfxEnabled())) return;
+    try {
+      final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
+      await player.setVolume(0.75);
+      await player.play(AssetSource(_undoFile));
+      if (await _isHapticsEnabled()) {
+        HapticFeedback.selectionClick();
+      }
+      Future.delayed(const Duration(milliseconds: 500), () async {
+        try {
+          await player.stop();
+          await player.dispose();
+        } catch (_) {}
+      });
+    } catch (_) {}
+  }
+
   Future<void> stopAll() async {
     await _sfxPlayer.stop();
-    // Do NOT stop BGM player here, as ambient music must run continuously.
-    // However, reset active SFX count and restore BGM volume if it was ducked.
     _activeSfxCount = 0;
     await updateBgmVolume();
   }
   
   Future<void> playTick() async {
-    if (await _isSfxEnabled() && await _isHapticsEnabled()) {
+    if (await _isSfxEnabled()) {
       try {
         final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
-        await player.setVolume(0.35);
-        await player.play(AssetSource('audio/Water Drip Click SFX.mp3'));
-        Future.delayed(const Duration(milliseconds: 400), () async {
+        await player.setVolume(0.40);
+        await player.play(AssetSource(_tapFile));
+        Future.delayed(const Duration(milliseconds: 300), () async {
           try {
             await player.stop();
             await player.dispose();
@@ -191,11 +243,12 @@ class AudioService {
     try {
       await _sfxPlayer.play(AssetSource(_winFile));
       if (await _isHapticsEnabled()) {
-        HapticFeedback.mediumImpact();
-        Future.delayed(const Duration(milliseconds: 300), () => HapticFeedback.mediumImpact());
+        HapticFeedback.heavyImpact();
+        Future.delayed(const Duration(milliseconds: 250), () => HapticFeedback.mediumImpact());
+        Future.delayed(const Duration(milliseconds: 500), () => HapticFeedback.lightImpact());
       }
       
-      Future.delayed(const Duration(milliseconds: 5000), () async {
+      Future.delayed(const Duration(milliseconds: 3000), () async {
         await _unduckBgm();
       });
     } catch (e) {
@@ -204,12 +257,12 @@ class AudioService {
   }
 
   Future<void> playClick() async {
-    if (await _isSfxEnabled() && await _isHapticsEnabled()) {
+    if (await _isSfxEnabled()) {
       try {
         final player = AudioPlayer()..setReleaseMode(ReleaseMode.stop);
-        await player.setVolume(0.35);
-        await player.play(AssetSource('audio/Water Drip Click SFX.mp3'));
-        Future.delayed(const Duration(milliseconds: 400), () async {
+        await player.setVolume(0.45);
+        await player.play(AssetSource(_tapFile));
+        Future.delayed(const Duration(milliseconds: 300), () async {
           try {
             await player.stop();
             await player.dispose();
